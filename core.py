@@ -439,7 +439,7 @@ class MRBT:
             self._update_digest(focus)
             focus = focus.parent
 
-    def k_order(self, k) -> Node:
+    def k_order(self, k):
         """
         Get element by it's order.
         Supports negative indexation to search in reversed order.
