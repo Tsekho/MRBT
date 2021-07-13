@@ -840,6 +840,8 @@ class MRBT:
         if self.root.color == RED:
             return "Root is red."
         focus = self.root
+        left_border = []
+        right_border = []
         last_not_red = True
         from_left = True
         move = "D"
@@ -862,8 +864,10 @@ class MRBT:
                         return "Child has no parent."
                     if focus[0].parent is not focus or focus[1].parent is not focus:
                         return "Child doesn't recognize parent."
-                    if focus[0].key > focus.key or focus[1].key <= focus.key:
-                        return "Child violates keys order."
+                if len(left_border) and focus.key <= left_border[-1]:
+                    return "Child violated keys order."
+                if len(right_border) and focus.key > right_border[-1]:
+                    return "Child violated keys order."
                 if focus.digest != self._calc_digest(focus):
                     return "Digests are wrong."
                 if focus.color != RED:
@@ -877,10 +881,15 @@ class MRBT:
                         bbalance_leaf = bbalance
                     if bbalance != bbalance_leaf:
                         return "Black depth is inconsistent."
-                    move = "U"
                     from_left = focus.is_left_child()
                     focus = focus.parent
+                    move = "U"
+                    if from_left and len(right_border):
+                        right_border.pop()
+                    elif len(left_border):
+                        left_border.pop()
                 else:
+                    right_border.append(focus.key)
                     focus = focus[0]
                     move = "D"
             else:
@@ -888,12 +897,17 @@ class MRBT:
                     bbalance -= 1
                 last_not_red = (focus.color != RED)
                 if from_left:
+                    left_border.append(focus.key)
                     focus = focus[1]
                     move = "D"
                 else:
-                    move = "U"
                     from_left = focus.is_left_child()
                     focus = focus.parent
+                    move = "U"
+                    if from_left and len(right_border):
+                        right_border.pop()
+                    elif len(left_border):
+                        left_border.pop()
         return None
 
 
