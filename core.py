@@ -1,5 +1,5 @@
 """
-MRBT (Merkle Red-Black Tree)
+MRBT (Red-Black Merkle Tree)
 ---------
 An efficient authenticated data structure
 based on generic Red-Black Tree with Merkle augmentation.
@@ -7,6 +7,11 @@ based on generic Red-Black Tree with Merkle augmentation.
 Original Python 2 implementation:
     Andrew Miller.
     https://github.com/amiller/redblackmerkle
+
+General TODO:
+    1. Clean the code up.
+    3. Decide whether get methods
+       should return objects or serializations.
 """
 
 
@@ -262,8 +267,8 @@ class MRBT:
         if hsh is not None:
             def _calc_digest(node):
                 if node.color != NIL:
-                    lhs = node.left.digest
-                    rhs = node.right.digest
+                    lhs = node[0].digest
+                    rhs = node[1].digest
                 else:
                     lhs = (node.dump_data(), bytes())
                     rhs = (node.dump_key(), bytes())
@@ -452,8 +457,17 @@ class MRBT:
 
         Returns
         -------
-        Node or None
-            Element with selected position if it's in range, None otherwise.
+        str
+            Key-value json of element with
+            selected position if it's in range, None otherwise.
+
+        Examples
+        --------
+        >>> a = MRBT.from_list([(1, "one"),
+        ...                     (4, "four"),
+        ...                     (5, "five")])
+        >>> print(a.k_order(2)) # indents are purposefully simplified
+        {key: 4, value: "\"four\""}
         """
         if k >= self.__len__() or k < -self.__len__():
             return None
@@ -466,7 +480,7 @@ class MRBT:
             else:
                 k -= focus[0].weight
                 focus = focus[1]
-        return focus
+        return {"key": focus.key, "value": focus.dump_data(as_str=True)}
 
     def compare(self, other) -> str:
         """
@@ -802,7 +816,7 @@ class MRBT:
 
     def test(self) -> None:
         """
-        Tests structure for:
+        Test structure for:
             1. BST properties:
                 - Correct keys ordering.
                 - Linkage consistency.
@@ -813,7 +827,7 @@ class MRBT:
                 - Absence of red-red relationships.
             3. Merkle properties:
                 - Digests consistency.
-            4. Miscellaneous and given:
+            4. Miscellaneous:
                 - Correct subtree size statistics.
         O(n).
         """
@@ -872,6 +886,24 @@ class MRBT:
 
 
 def verify(t: MRBT, vo: tuple, hsh=sha256_dual):
+    """
+    Validate verification object
+
+    Parameters
+    ----------
+    t : MRBT
+        Trusted structure.
+    vo : tuple
+        Verification object.
+    hsh : func(lhs: bytes, rhs: bytes) -> bytes
+        Dual argument hash function used in configuration
+        for node Merkle augmentation.
+
+    Returns
+    -------
+    bool
+        True if validation succeeded, False otherwise.
+    """
     if t.digest != vo[0]:
         return False
     for i in range(len(vo) - 1, 0, -1):
