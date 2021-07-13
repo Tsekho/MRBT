@@ -10,8 +10,9 @@ Original Python 2 implementation:
 
 General TODO:
     1. Clean the code up.
-    3. Decide whether get methods
+    2. Decide whether get methods
        should return objects or serializations.
+    3. Decide whether code should raise exceptions.
 """
 
 
@@ -406,7 +407,7 @@ class MRBT:
         `val`
             Value stored by the key if auth is False and kay exists.
         None
-            If key dosn't exist.
+            If key doesn't exist.
         """
         found, search_result = self._search(key, pair=True)
         if not found:
@@ -814,7 +815,7 @@ class MRBT:
             self._update_digest(focus)
             focus = focus.parent
 
-    def test(self) -> None:
+    def test(self):
         """
         Test structure for:
             1. BST properties:
@@ -830,9 +831,14 @@ class MRBT:
             4. Miscellaneous:
                 - Correct subtree size statistics.
         O(n).
-        """
 
-        assert self.root.color != RED
+        Returns
+        -------
+        str or None
+            Message if a problem has been encountered, None otherwise.
+        """
+        if self.root.color == RED:
+            return "Root is red."
         focus = self.root
         last_not_red = True
         from_left = True
@@ -840,32 +846,37 @@ class MRBT:
         bbalance = 0
         bbalance_leaf = -1
         while focus != None:
-            if focus.color == NIL:
-                assert focus[0] is None
-                assert focus[1] is None
-                assert focus.weight == 1 or focus.key == INF
-            else:
-                assert focus[0] is not None
-                assert focus[1] is not None
-                assert focus.weight == focus[0].weight + focus[1].weight
-                assert focus[0].is_child()
-                assert focus[1].is_child()
-                assert focus[0].parent is focus
-                assert focus[1].parent is focus
-                assert focus[0].key <= focus.key
-                assert focus[1].key > focus.key
-            assert focus.is_child() or self.root is focus
-            assert focus.digest == self._calc_digest(focus)
             if move == "D":
+                if focus.color == NIL:
+                    if focus[0] is not None or focus[1] is not None:
+                        return "Leaf has children."
+                    if (focus.key != INF and focus.weight != 1) or \
+                       (focus.key == INF and focus.weight != 0):
+                        return "Leaf has wrong weight."
+                else:
+                    if focus[0] is None or focus[1] is None:
+                        return "Node misses child."
+                    if focus.weight != focus[0].weight + focus[1].weight:
+                        return "Node has wrong leaf."
+                    if not focus[0].is_child() or not focus[1].is_child():
+                        return "Child has no parent."
+                    if focus[0].parent is not focus or focus[1].parent is not focus:
+                        return "Child doesn't recognize parent."
+                    if focus[0].key > focus.key or focus[1].key <= focus.key:
+                        return "Child violates keys order."
+                if focus.digest != self._calc_digest(focus):
+                    return "Digests are wrong."
                 if focus.color != RED:
                     bbalance += 1
                 else:
-                    assert last_not_red
+                    if not last_not_red:
+                        return "Red-red relationship."
                 last_not_red = (focus.color != RED)
                 if focus.color == NIL:
                     if bbalance_leaf == -1:
                         bbalance_leaf = bbalance
-                    assert bbalance == bbalance_leaf
+                    if bbalance != bbalance_leaf:
+                        return "Black depth is inconsistent."
                     move = "U"
                     from_left = focus.is_left_child()
                     focus = focus.parent
@@ -883,6 +894,7 @@ class MRBT:
                     move = "U"
                     from_left = focus.is_left_child()
                     focus = focus.parent
+        return None
 
 
 def verify(t: MRBT, vo: tuple, hsh=sha256_dual):
