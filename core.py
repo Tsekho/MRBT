@@ -10,9 +10,8 @@ Original Python 2 implementation:
 
 General TODO:
     1. Clean the code up.
-    2. Decide whether get methods
-       should return objects or serializations.
-    3. Decide whether code should raise exceptions.
+    2. Decide whether code should raise exceptions.
+    3. Typing corrections.
 """
 
 
@@ -47,7 +46,7 @@ class Node:
         Left child Node.
     right : Node or None, default None
         Right child Node.
-    val : object
+    val : object, default None
         Stored data, must be json-serializable.
     """
 
@@ -73,20 +72,25 @@ class Node:
 
         Parameters
         ----------
-        val
-            New value to store.
+        val : object
+            New value to store, must be json-serializable.
         """
         self.val = val
 
     def dump_key(self) -> bytes:
         """
         Return bytes representation of node's key.
+
+        Returns
+        -------
+        bytes
+            Bytes representation of node's key.
         """
         if self.key == INF:
             return bytes()
         return self.key.to_bytes(32, "little")
 
-    def dump_data(self, as_str=False):
+    def dump_data(self, as_str: bool = False):
         """
         Return json serialization for stored value.
 
@@ -97,8 +101,10 @@ class Node:
 
         Returns
         -------
-        bytes or str
-            If as_str is True, return json serialization as str, otherwise as bytes.
+        bytes
+            Value bytes json object if as_str is False.
+        str
+            Value str json object if as_str is True.
         """
         res = json.dumps(self.val)
         if as_str:
@@ -157,8 +163,10 @@ class Node:
 
         Returns
         -------
-        Node or None
-            Return node's sibling if it exists, None otherwise.
+        Node
+            Node's sibling if it exists.
+        None
+            If sibling doesn't exist.
         """
         if self.is_root():
             return None
@@ -173,8 +181,10 @@ class Node:
 
         Returns
         -------
-        Node or None
-            Return node's grandparent if it exists, None otherwise.
+        Node
+            Node's grandparent if it exists
+        None
+            If grandparent doesn't exist.
         """
         if self.is_root() or self.parent.is_root():
             return None
@@ -186,14 +196,16 @@ class Node:
 
         Returns
         -------
-        Node or None
-            Return node's uncle if it exists, None otherwise.
+        Node
+            Node's uncle if it exists.
+        None
+            If uncle doesn't exist.
         """
         if self.is_root():
             return None
         return self.parent.get_sibling()
 
-    def __str__(self, _indent="  ") -> str:
+    def __str__(self, _indent: str = "  ") -> str:
         """
         Return node's recursive string representation.
         Allows `print(self)` and `str(self)` syntaxes.
@@ -225,8 +237,10 @@ class Node:
 
         Returns
         -------
-        Node or None
-            Node's selected child if it exists, None otherwise.
+        Node
+            Node's selected child if it exists.
+        None
+            If selecter child doesn't exits.
         """
         if direction in ["L", 0, False]:
             return self.left
@@ -259,12 +273,12 @@ class MRBT:
 
     Parameters
     ----------
-    hsh : func(lhs: bytes, rhs: bytes) -> bytes, optional
+    hsh : func(lhs: bytes, rhs: bytes) -> bytes, default sha256_dual
         Dual argument hash function for node Merkle augmentation.
     """
 
     def __init__(self, hsh=sha256_dual) -> None:
-        self.root = Node(INF, NIL)
+        self._root = Node(INF, NIL)
         if hsh is not None:
             def _calc_digest(node):
                 if node.color != NIL:
@@ -278,7 +292,7 @@ class MRBT:
             self._calc_digest = _calc_digest
         else:
             self._calc_digest = lambda x: (bytes(), bytes())
-        self._update_digest(self.root)
+        self._update_digest(self._root)
 
     @classmethod
     def from_list(cls, lst, **kwargs):
@@ -309,7 +323,7 @@ class MRBT:
         int
             Number of stored keys.
         """
-        return self.root.weight
+        return self._root.weight
 
     @property
     def digest(self) -> tuple:
@@ -319,7 +333,7 @@ class MRBT:
         tuple
             Root digest of the structure.
         """
-        return self.root.digest
+        return self._root.digest
 
     def insert(self, key: int, val=None) -> None:
         """
@@ -345,7 +359,7 @@ class MRBT:
                               left=insertion_leaf, right=focus)
         insertion_leaf.parent = insertion_node
         if focus.is_root():
-            self.root = insertion_node
+            self._root = insertion_node
         else:
             focus.parent[1 - direction] = insertion_node
         focus.parent = insertion_node
@@ -376,7 +390,7 @@ class MRBT:
         d_black = (parent.color != RED) and (sibling.color != RED)
 
         if parent.is_root():
-            self.root = sibling
+            self._root = sibling
         else:
             direction_1 = parent.is_left_child()
             parent.parent[1 - direction_1] = sibling
@@ -387,7 +401,7 @@ class MRBT:
 
         self._delete_fix(sibling, d_black)
 
-    def get(self, key: int, auth=False):
+    def get(self, key: int, auth: bool = False):
         """
         Get value stored by the key.
         O(log n).
@@ -401,11 +415,11 @@ class MRBT:
 
         Returns
         -------
-        `val`, tuple
+        object, tuple
             Value stored by the key and it's verification object
             if auth is False and key exists.
-        `val`
-            Value stored by the key if auth is False and kay exists.
+        object
+            Value stored by the key if auth is False and key exists.
         None
             If key doesn't exist.
         """
@@ -419,10 +433,11 @@ class MRBT:
             return focus.val
 
         vo = []
+        val = focus.val
         while focus is not None:
             vo.append(focus.digest)
             focus = focus.parent
-        return focus.val, tuple(vo)
+        return val, tuple(vo)
 
     def set(self, key: int, val=None) -> None:
         """
@@ -433,7 +448,7 @@ class MRBT:
         ----------
         key : int
             Key to store the value by.
-        val
+        val : object, default None
             Value to store by that key.
         """
         found, search_result = self._search(key, pair=True)
@@ -445,7 +460,7 @@ class MRBT:
             self._update_digest(focus)
             focus = focus.parent
 
-    def k_order(self, k):
+    def k_order(self, k: int, as_str: bool = True):
         """
         Get element by it's order.
         Supports negative indexation to search in reversed order.
@@ -455,47 +470,60 @@ class MRBT:
         ----------
         k : int
             Position of node to return.
+        as_str : bool, default True
+            Whether to return json object or string.
 
         Returns
         -------
+        dict
+            Key-value dict json object if as_str is False.
         str
-            Key-value json of element with
-            selected position if it's in range, None otherwise.
+            Key-value str json object if as_str is True.
+        None
+            If order is out of range.
 
         Examples
         --------
         >>> a = MRBT.from_list([(1, "one"),
         ...                     (4, "four"),
         ...                     (5, "five")])
-        >>> print(a.k_order(2)) # indents are purposefully simplified
-        {key: 4, value: "\"four\""}
+        >>> print(a.k_order(2, as_str=False))
+        {"key": 4, "value": "four"}
         """
         if k >= self.__len__() or k < -self.__len__():
             return None
         if k < 0:
             k = self.__len__() + k
-        focus = self.root
+        focus = self._root
         while focus.color != NIL:
             if k < focus[0].weight:
                 focus = focus[0]
             else:
                 k -= focus[0].weight
                 focus = focus[1]
-        return {"key": focus.key, "value": focus.dump_data(as_str=True)}
+        res = {"key": focus.key, "value": focus.val}
+        if as_str:
+            return json.dumps(res)
+        return res
 
-    def compare(self, other) -> str:
+    def compare(self, other, as_str: bool = True) -> str:
         """
-        Get symmetric difference with other object of the class in json str format.
+        Get symmetric difference with other object of the class in json format.
         O(n + o).
 
         Parameters
         ----------
         other : MRBT
+            Object of a class for comparison.
+        as_str : bool, default True
+            Whether to return json object or string.
 
         Returns
         -------
+        list
+            Symmetric difference list json object if as_str is False.
         str
-            Json representation of symmetric difference.
+            Symmetric difference str json object if as_str is False
 
         Examples
         --------
@@ -504,57 +532,38 @@ class MRBT:
         ...                     (5, "five")])
         >>> b = MRBT.from_list([(1, "one"),
         ...                     (2, "six")])
-        >>> print(a.compare(b)) # indents are purposefully simplified
-        [["Source", {key: 2, value: "\"two\""}],\
-         ["Destination", {key: 2, value: "\"six\""}],\
-         ["Source", {key: 5, value: "\"five\""}]]
+        >>> print(a.compare(b, as_str=False))
+        [["Destination", {"key": 2, "value": "six"}],
+         ["Source", {"key": 2, "value": "two"}],
+         ["Source", {"key": 5, "value": "five"}]]
         """
         res = []
-        if not (self.__len__() or other.__len__()):
+        iterator = [["Source", self._iter()],
+                    ["Destination", other._iter()]]
+        nodes = [next(iterator[0][1]), next(iterator[1][1])]
+        while nodes[0] is not None or nodes[1] is not None:
+            direction = -1
+            if nodes[0] is None:
+                nodes[0], nodes[1] = nodes[1], nodes[0]
+                iterator[0], iterator[1] = iterator[1], iterator[0]
+            if nodes[1] is None:
+                direction = 0
+            elif nodes[0].key < nodes[1].key:
+                direction = 0
+            elif nodes[0].key > nodes[1].key:
+                direction = 1
+            elif nodes[0].digest != nodes[1].digest:
+                direction = 1
+            if direction == -1:
+                nodes = [next(iterator[0][1]), next(iterator[1][1])]
+            else:
+                res.append([iterator[direction][0],
+                            {"key": nodes[direction].key,
+                             "value": nodes[direction].val}])
+                nodes[direction] = next(iterator[direction][1])
+        if as_str:
             return json.dumps(res)
-
-        it1 = self.__iter__()
-        it2 = other.__iter__()
-        it1_node = next(it1)
-        it2_node = next(it2)
-        it1c = 0
-        it2c = 0
-
-        while it1c != -1 or it2c != -1:
-            case = 0
-            if it2c == -1:
-                case = 0
-            elif it2c == -1:
-                case = 1
-            elif it1_node.key < it2_node.key:
-                case = 0
-            elif it1_node.key > it2_node.key:
-                case = 1
-            elif it1_node.digest != it2_node.digest:
-                case = 0
-            else:
-                case = 2
-
-            if case == 0:
-                res.append(["Source", {"key": it1_node.key,
-                                       "value": it1_node.dump_data(as_str=True)}])
-                it1c += 1
-                it1_node = next(it1) if it1c < self.__len__() else None
-            elif case == 1:
-                res.append(["Destination", {"key": it2_node.key,
-                                            "value": it2_node.dump_data(as_str=True)}])
-                it2c += 1
-                it2_node = next(it2) if it2c < other.__len__() else None
-            else:
-                it1c += 1
-                it2c += 1
-                it1_node = next(it1) if it1c < self.__len__() else None
-                it2_node = next(it2) if it2c < other.__len__() else None
-            if it1c >= self.__len__():
-                it1c = -1
-            if it2c >= other.__len__():
-                it2c = -1
-        return json.dumps(res)
+        return res
 
     def __len__(self) -> int:
         """
@@ -567,43 +576,37 @@ class MRBT:
         int
             Number of stored keys.
         """
-        return self.root.weight
+        return self._root.weight
 
     def __iter__(self) -> iter:
         """
-        Get iterator for stored leaves.
+        Iterator for stored leaves.
         Allows `for x in self` syntax.
         DFS implementation, next element in
         O(log n) w.c., O(1) amortized.
 
-        Returns
-        -------
-        iterator
-            Yields leaf nodes by keys order.
+        Yields
+        ------
+        dict
+            Key-value dict json object of next element in order.
+
+        Examples
+        --------
+        >>> a = MRBT.from_list([(1, "one"),
+        ...                     (4, "four"),
+        ...                     (5, "five")])
+        >>> for item in a:
+        ...     print("found:", item)
+        found: {'key': 1, 'value': 'one'}
+        found: {'key': 4, 'value': 'four'}
+        found: {'key': 5, 'value': 'five'}
         """
-        focus = self.root
-        from_left = True
-        move = "D"
-        while focus != None:
-            if move == "D":
-                if focus.color == NIL:
-                    if focus.key == INF:
-                        return
-                    yield focus
-                    move = "U"
-                    from_left = focus.is_left_child()
-                    focus = focus.parent
-                else:
-                    focus = focus[0]
-                    move = "D"
-            else:
-                if from_left:
-                    focus = focus[1]
-                    move = "D"
-                else:
-                    move = "U"
-                    from_left = focus.is_left_child()
-                    focus = focus.parent
+        iterator = self._iter()
+        node = next(iterator)
+        while node is not None:
+            yield {"key": node.key, "value": node.val}
+            node = next(iterator)
+        return
 
     def __contains__(self, key: int) -> bool:
         """
@@ -635,8 +638,10 @@ class MRBT:
 
         Returns
         -------
-        `val`, None
-            Stored value if key exists, None otherwise.
+        object
+            Stored value if key exists.
+        None
+            If key doesn't exits.
         """
         return self.get(key)
 
@@ -650,8 +655,8 @@ class MRBT:
         ----------
         key : int
             Key to store value by.
-        val
-            Value to store by that key.
+        val : object
+            Value to store by that key, must be json-serializable.
         """
         found, search_result = self._search(key, pair=True)
         if not found:
@@ -675,8 +680,13 @@ class MRBT:
         ----------
         other : MRBT
             Other object to compare digests.
+
+        Returns
+        -------
+        bool
+            True if root digest are equal, False otherwise.
         """
-        return self.root.digest == other.digest
+        return self._root.digest == other.digest
 
     def __str__(self) -> str:
         """
@@ -689,15 +699,41 @@ class MRBT:
         str
             Root node's recursive string representation.
         """
-        return self.root.__str__()
+        return self._root.__str__()
+
+    def _iter(self):
+        focus = self._root
+        from_left = True
+        move = "D"
+        while focus != None:
+            if move == "D":
+                if focus.color == NIL:
+                    if focus.key == INF:
+                        yield None
+                        return
+                    yield focus
+                    move = "U"
+                    from_left = focus.is_left_child()
+                    focus = focus.parent
+                else:
+                    focus = focus[0]
+                    move = "D"
+            else:
+                if from_left:
+                    focus = focus[1]
+                    move = "D"
+                else:
+                    move = "U"
+                    from_left = focus.is_left_child()
+                    focus = focus.parent
 
     def _update_digest(self, node: Node) -> None:
         if node.color != NIL:
             node.weight = node[0].weight + node[1].weight
         node.digest = self._calc_digest(node)
 
-    def _search(self, key: int, pair=False):
-        focus = self.root
+    def _search(self, key: int, pair: bool = False):
+        focus = self._root
         found = True
         res = []
         while focus.color != NIL:
@@ -719,7 +755,7 @@ class MRBT:
         subtree = node[direction] if node.color != NIL else None
 
         if parent.is_root():
-            self.root = node
+            self._root = node
         else:
             direction_1 = parent.is_left_child()
             parent.parent[1 - direction_1] = node
@@ -760,14 +796,14 @@ class MRBT:
                 P.color = BLACK
                 G.color = RED
                 continue
-        if self.root.color == RED:
-            self.root.color = BLACK  # CASE 0
+        if self._root.color == RED:
+            self._root.color = BLACK  # CASE 0
 
         while focus is not None:
             self._update_digest(focus)
             focus = focus.parent
 
-    def _delete_fix(self, focus: Node, d_black=False) -> None:
+    def _delete_fix(self, focus: Node, d_black: bool = False) -> None:
         while d_black:
             direction = int(focus.is_left_child())
             P = focus.parent
@@ -834,12 +870,14 @@ class MRBT:
 
         Returns
         -------
-        str or None
-            Message if a problem has been encountered, None otherwise.
+        str
+            Message if a problem has been encountered.
+        None
+            If structure test passed.
         """
-        if self.root.color == RED:
+        if self._root.color == RED:
             return "Root is red."
-        focus = self.root
+        focus = self._root
         left_border = []
         right_border = []
         last_not_red = True
@@ -930,9 +968,9 @@ def verify(t: MRBT, vo: tuple, hsh=sha256_dual):
     bool
         True if validation succeeded, False otherwise.
     """
-    if t.digest != vo[0]:
+    if t.digest != vo[-1]:
         return False
-    for i in range(len(vo) - 1, 0, -1):
-        if hsh(*vo[i]) not in vo[i - 1]:
+    for i in range(len(vo) - 1):
+        if hsh(*vo[i]) not in vo[i + 1]:
             return False
     return True
