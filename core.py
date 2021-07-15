@@ -90,13 +90,13 @@ class Node:
             return bytes()
         return self.key.to_bytes(32, "little")
 
-    def dump_data(self, as_str: bool = False):
+    def dump_data(self, as_str: bool = True):
         """
         Return json serialization for stored value.
 
         Parameters
         ----------
-        as_str : bool, default False
+        as_str : bool, default True
             If True, return json serialization as str, otherwise as bytes.
 
         Returns
@@ -285,7 +285,7 @@ class MRBT:
                     lhs = node[0].digest
                     rhs = node[1].digest
                 else:
-                    lhs = (node.dump_data(), bytes())
+                    lhs = (node.dump_data(as_str=False), bytes())
                     rhs = (node.dump_key(), bytes())
                 return (hsh(*lhs), hsh(*rhs))
 
@@ -417,14 +417,18 @@ class MRBT:
         -------
         object, tuple
             Value stored by the key and it's verification object
-            if auth is False and key exists.
+            if auth is True and key exists.
+        None, None
+            If key doesn't exist and auth is True.
         object
             Value stored by the key if auth is False and key exists.
         None
-            If key doesn't exist.
+            If key doesn't exist and auth is False.
         """
         found, search_result = self._search(key, pair=True)
         if not found:
+            if auth:
+                return None, None
             return None
 
         focus = search_result[-1]
@@ -578,17 +582,24 @@ class MRBT:
         """
         return self._root.weight
 
-    def __iter__(self) -> iter:
+    def __iter__(self, as_str: bool = True) -> iter:
         """
         Iterator for stored leaves.
         Allows `for x in self` syntax.
         DFS implementation, next element in
         O(log n) w.c., O(1) amortized.
 
+        Parameters
+        ----------
+        as_str : bool, default True
+
+
         Yields
         ------
+        str
+            Key-value str json object of next element in order if as_str is True.
         dict
-            Key-value dict json object of next element in order.
+            Key-value dict json object of next element in order if as_srt is False.
 
         Examples
         --------
@@ -604,7 +615,11 @@ class MRBT:
         iterator = self._iter()
         node = next(iterator)
         while node is not None:
-            yield {"key": node.key, "value": node.val}
+            res = {"key": node.key, "value": node.val}
+            if as_str:
+                yield json.dumps(res)
+            else:
+                yield res
             node = next(iterator)
         return
 
