@@ -39,8 +39,11 @@ authentication.
 
 - `MRBT(hsh=sha256_dual)`
   - `hsh` is a function used for Merkle augmentation, takes 2 `bytes` objects and returns their combined hash `bytes`.
-- `MRBT.from_list(lst, **kwargs)`
-  - `lst` is iterable of either keys or key-value pairs for initial state.
+- `MRBT.from_iter(itr, **kwargs)`
+  - `itr` is iterable of either keys (for `None` values) or key-value pairs for initial state, keys must be `int` and values must be json-serializable.
+  - `**kwargs` are additional keywords passed to original constructor (only `hsh` keyword supported yet).
+- `MRBT.from_dict(dct, **kwargs)`
+  - `dct` is a key-value `dict` object, keys must be `int` and values must be json-serializable.
   - `**kwargs` are additional keywords passed to original constructor (only `hsh` keyword supported yet).
 
 #### Attributes
@@ -56,24 +59,24 @@ authentication.
   - Inserts `key` key with `val` value, `val` must be json-serializable. Ignores existing keys.
 - `delete(key)`
   - Deletes `key` key from the storage. Ignores missing keys.
-- `get(key, auth=False)`
-  - Returns stored `key` key value if `auth` is false.
-  - Returns pair of stored key value and verification object if `auth` is true.
-  - Returns `None` if key is missing and `auth` is false.
-  - Returns `None, None` pair if key is missing and `auth` is true.
+- `get(key, verified=False)`
+  - Returns stored `key` key value if `verified` is false.
+  - Returns pair of stored key value and verification object if `verified` is true.
+  - Returns `None` if key is missing and `verified` is false.
+  - Returns `None, None` pair if key is missing and `verified` is true.
 - `set(key, val=None)`
-  - Updates `key` key value with `val`, `val` must be json-serializable. Ignores missing keys.
-- `k_order(k, as_str=True)`
+  - Updates `key` key value with `val` if key exists, inserts it otherwise, `val` must be json-serializable.
+- `by_keys_order(k, as_json=False)`
   - List-alike indexing for `k`'th ordered `key` object, supports negatives for reversed order.
-  - Returns `{'key': <key>, 'value': <value>}` `dict` if `as_str` is false, its json `str` otherwise.
+  - Returns `{'key': <key>, 'value': <value>}` `dict` if `as_json` is false, its json `str` otherwise.
   - Returns `None` if `k` is out of range.
-- `compare(other, as_str=True)`
-  - Returns comparison result over other `MRBT` object in `[[<target>, {'key': <key>, 'value': <value>}], ...]` `list` format if `as_str` is false, its json `str` otherwise.
+- `get_change_set(other, as_json=False)`
+  - Returns comparison result over other `MRBT` object in `[[<target>, {'key': <key>, 'value': <value>}], ...]` `list` format if `as_json` is false, its json `str` otherwise.
     - `<target>` is either `'Source'` for `self` or `'Destination'` for `other`, `<key>` and `<value>` is a point of difference (either key is unique to the collection or values differ).
 - `__len__()`
   - Allows `len(self)` for getting `size` attribute.
-- `__iter__(as_str=True)`
-  - Allows `for item in self` iterating. Yields `{'key': <key>, 'value': <value>}` `dict` objects if `as_str` is false, its json `str` otherwise.
+- `__iter__(as_json=False)`
+  - Allows `for item in self` iterating. Yields `{'key': <key>, 'value': <value>}` `dict` objects if `as_json` is false, its json `str` otherwise.
 - `__contains__()`
   - Allows `key in self` checks, returns `True` if `key` key exists, `False` otherwise.
 - `__getitem__(key)`
@@ -81,12 +84,11 @@ authentication.
   - Returns `None` if key is missing.
 - `__setitem__(key, val)`
   - Allows `self[key] = val` setting, updates `key` key value with `val` if key exists, inserts it otherwise, `val` must be json-serializable.
+  - `set` method analogue.
 - `__eq__(other)`
   - Allows `self == other` morphism checks. False positive rate is controlled by hash function choice.
 - `__str__(self)`
   - Allows `print(self)` printing for basic visualization.
-- `test()`
-  - Tests structure for BST, RBT and Merkle correctness. Returns error `str` message if failed, `None` otherwise.
 
 ### `verify` function
 

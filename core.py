@@ -65,6 +65,8 @@ class Node:
         if self.color == NIL and self.key != INF:
             self.store(val)
             self.weight = 1
+        else:
+            self.shortcut = None
 
     def store(self, val) -> None:
         """
@@ -88,26 +90,26 @@ class Node:
         """
         if self.key == INF:
             return bytes()
-        return self.key.to_bytes(32, "little")
+        return self.key.to_bytes(32, "big", signed=True)
 
-    def dump_data(self, as_str: bool = True):
+    def dump_data(self, as_json: bool = False):
         """
         Return json serialization for stored value.
 
         Parameters
         ----------
-        as_str : bool, default True
+        as_json : bool, default False
             If True, return json serialization as str, otherwise as bytes.
 
         Returns
         -------
         bytes
-            Value bytes json object if as_str is False.
+            Value bytes json object if as_json is False.
         str
-            Value str json object if as_str is True.
+            Value str json object if as_json is True.
         """
         res = json.dumps(self.val)
-        if as_str:
+        if as_json:
             return res
         return res.encode("utf-8")
 
@@ -285,7 +287,7 @@ class MRBT:
                     lhs = node[0].digest
                     rhs = node[1].digest
                 else:
-                    lhs = (node.dump_data(as_str=False), bytes())
+                    lhs = (node.dump_data(), bytes())
                     rhs = (node.dump_key(), bytes())
                 return (hsh(*lhs), hsh(*rhs))
 
@@ -295,24 +297,42 @@ class MRBT:
         self._update_digest(self._root)
 
     @classmethod
-    def from_list(cls, lst, **kwargs):
+    def from_iter(cls, itr, **kwargs):
         """
         Construct MRBT object from iterable.
         O(n log n).
 
         Parameters
         ----------
-        lst : iterable
-            Collection of keys or key, value pairs.
+        itr : iterable
+            Collection of keys or key-value pairs.
         **kwargs :
             Additional keywords passed to MRBT constructor.
         """
         res = cls(**kwargs)
-        for it in lst:
+        for it in itr:
             if isinstance(it, (int)):
                 res.insert(it)
             else:
                 res.insert(*it)
+        return res
+
+    @classmethod
+    def from_dict(cls, dct: dict, **kwargs):
+        """
+        Construct MRBT object from key-value dict object.
+        O(n log n).
+
+        Parameters
+        ----------
+        dct : dict
+            Key-value dict object.
+        **kwargs :
+            Additional keywords passed to MRBT constructor.
+        """
+        res = cls(**kwargs)
+        for it in dct.items():
+            res.insert(*it)
         return res
 
     @property
@@ -347,16 +367,17 @@ class MRBT:
         val : optional
             Value to store by that key.
         """
-        found, search_result = self._search(key, pair=True)
+        found, search_result = self._search(key)
         if found:
             return
 
-        focus = search_result[-1]
+        focus = search_result
         direction = focus.is_left_child()
 
         insertion_leaf = Node(key, NIL, val=val)
         insertion_node = Node(key, parent=focus.parent,
                               left=insertion_leaf, right=focus)
+        insertion_node.shortcut = insertion_leaf
         insertion_leaf.parent = insertion_node
         if focus.is_root():
             self._root = insertion_node
@@ -376,13 +397,13 @@ class MRBT:
         key : int
             Key to delete.
         """
-        found, search_result = self._search(key, pair=True)
+        found, search_result = self._search(key)
         if not found:
             return
 
-        focus = search_result[-1]
-        if focus.key != focus.parent.key:
-            search_result[0].key = focus.parent.key
+        focus = search_result.shortcut
+        search_result.key = focus.parent.key
+        search_result.shortcut = focus.parent.shortcut
 
         parent = focus.parent
         sibling = focus.get_sibling()
@@ -401,7 +422,7 @@ class MRBT:
 
         self._delete_fix(sibling, d_black)
 
-    def get(self, key: int, auth: bool = False):
+    def get(self, key: int, verified: bool = False):
         """
         Get value stored by the key.
         O(log n).
@@ -410,30 +431,30 @@ class MRBT:
         ----------
         key : int
             Key to get value from.
-        auth : bool, default False
+        verified : bool, default False
             Return with verification object if True.
 
         Returns
         -------
         object, tuple
             Value stored by the key and it's verification object
-            if auth is True and key exists.
+            if verified is True and key exists.
         None, None
-            If key doesn't exist and auth is True.
+            If key doesn't exist and verified is True.
         object
-            Value stored by the key if auth is False and key exists.
+            Value stored by the key if verified is False and key exists.
         None
-            If key doesn't exist and auth is False.
+            If key doesn't exist and verified is False.
         """
-        found, search_result = self._search(key, pair=True)
+        found, search_result = self._search(key)
         if not found:
-            if auth:
+            if verified:
                 return None, None
             return None
 
-        focus = search_result[-1]
+        focus = search_result.shortcut
 
-        if not auth:
+        if not verified:
             return focus.val
 
         vo = []
@@ -445,7 +466,7 @@ class MRBT:
 
     def set(self, key: int, val=None) -> None:
         """
-        Set value to store by the key if it exists.
+        Set value stored by the key or insert it if key doesn't exist.
         O(log n).
 
         Parameters
@@ -453,18 +474,20 @@ class MRBT:
         key : int
             Key to store the value by.
         val : object, default None
-            Value to store by that key.
+            Value to store by that key, must be json-serializable.
         """
-        found, search_result = self._search(key, pair=True)
+        found, search_result = self._search(key)
         if not found:
-            return
-        focus = search_result[-1]
+            return self.insert(key, val)
+
+        focus = search_result.shortcut
+
         focus.store(val)
         while focus is not None:
             self._update_digest(focus)
             focus = focus.parent
 
-    def k_order(self, k: int, as_str: bool = True):
+    def by_keys_order(self, k: int, as_json: bool = False):
         """
         Get element by it's order.
         Supports negative indexation to search in reversed order.
@@ -474,24 +497,24 @@ class MRBT:
         ----------
         k : int
             Position of node to return.
-        as_str : bool, default True
+        as_json : bool, default False
             Whether to return json object or string.
 
         Returns
         -------
         dict
-            Key-value dict json object if as_str is False.
+            Key-value dict json object if as_json is False.
         str
-            Key-value str json object if as_str is True.
+            Key-value str json object if as_json is True.
         None
             If order is out of range.
 
         Examples
         --------
-        >>> a = MRBT.from_list([(1, "one"),
+        >>> a = MRBT.from_iter([(1, "one"),
         ...                     (4, "four"),
         ...                     (5, "five")])
-        >>> print(a.k_order(2, as_str=False))
+        >>> print(a.k_order(2, as_json=False))
         {"key": 4, "value": "four"}
         """
         if k >= self.__len__() or k < -self.__len__():
@@ -506,66 +529,90 @@ class MRBT:
                 k -= focus[0].weight
                 focus = focus[1]
         res = {"key": focus.key, "value": focus.val}
-        if as_str:
+        if as_json:
             return json.dumps(res)
         return res
 
-    def compare(self, other, as_str: bool = True) -> str:
+    def get_change_set(self, other, as_json: bool = False):
         """
         Get symmetric difference with other object of the class in json format.
-        O(n + o).
+        O(n + o) w.c., O(k log n) for k << n insertions / deletions / modifications.
 
         Parameters
         ----------
         other : MRBT
             Object of a class for comparison.
-        as_str : bool, default True
+        as_json : bool, default False
             Whether to return json object or string.
 
         Returns
         -------
         list
-            Symmetric difference list json object if as_str is False.
+            Symmetric difference list json object if as_json is False.
         str
-            Symmetric difference str json object if as_str is False
+            Symmetric difference str json object if as_json is False
 
         Examples
         --------
-        >>> a = MRBT.from_list([(1, "one"),
+        >>> a = MRBT.from_iter([(1, "one"),
         ...                     (2, "two"),
         ...                     (5, "five")])
-        >>> b = MRBT.from_list([(1, "one"),
+        >>> b = MRBT.from_iter([(1, "one"),
         ...                     (2, "six")])
-        >>> print(a.compare(b, as_str=False))
+        >>> print(a.compare(b, as_json=False))
         [["Destination", {"key": 2, "value": "six"}],
          ["Source", {"key": 2, "value": "two"}],
          ["Source", {"key": 5, "value": "five"}]]
         """
+        focus = [["Source", self._root], ["Destination", other._root]]
+        for i in range(2):
+            while focus[i][1][0] is not None:
+                focus[i][1] = focus[i][1][0]
+            focus[i][1] = focus[i][1].parent
+
         res = []
-        iterator = [["Source", self._iter()],
-                    ["Destination", other._iter()]]
-        nodes = [next(iterator[0][1]), next(iterator[1][1])]
-        while nodes[0] is not None or nodes[1] is not None:
-            direction = -1
-            if nodes[0] is None:
-                nodes[0], nodes[1] = nodes[1], nodes[0]
-                iterator[0], iterator[1] = iterator[1], iterator[0]
-            if nodes[1] is None:
-                direction = 0
-            elif nodes[0].key < nodes[1].key:
-                direction = 0
-            elif nodes[0].key > nodes[1].key:
-                direction = 1
-            elif nodes[0].digest != nodes[1].digest:
-                direction = 1
-            if direction == -1:
-                nodes = [next(iterator[0][1]), next(iterator[1][1])]
+
+        def _next(target, skip=False):
+            nonlocal focus
+            if focus[target][1][1].color == NIL:
+                skip = True
+            if skip:
+                while focus[target][1].is_right_child():
+                    focus[target][1] = focus[target][1].parent
+                focus[target][1] = focus[target][1].parent
             else:
-                res.append([iterator[direction][0],
-                            {"key": nodes[direction].key,
-                             "value": nodes[direction].val}])
-                nodes[direction] = next(iterator[direction][1])
-        if as_str:
+                focus[target][1] = focus[target][1][1]
+                while focus[target][1][0].color != NIL:
+                    focus[target][1] = focus[target][1][0]
+
+        def _write(target):
+            nonlocal focus
+            res.append([focus[target][0],
+                        {"key": focus[target][1].shortcut.key,
+                         "value": focus[target][1].shortcut.val}])
+
+        while not (focus[0][1] is None and focus[1][1] is None):
+            if focus[1][1] is None:
+                _write(0)
+                _next(0)
+            elif focus[0][1] is None:
+                _write(1)
+                _next(1)
+            elif focus[0][1].key < focus[1][1].key:
+                _write(0)
+                _next(0)
+            elif focus[0][1].key > focus[1][1].key:
+                _write(1)
+                _next(1)
+            else:
+                if focus[0][1].shortcut.digest != focus[1][1].shortcut.digest:
+                    _write(0)
+                    _write(1)
+                cut_allowed = (focus[0][1].digest[1] == focus[1][1].digest[1])
+                _next(0, skip=cut_allowed)
+                _next(1, skip=cut_allowed)
+
+        if as_json:
             return json.dumps(res)
         return res
 
@@ -582,7 +629,7 @@ class MRBT:
         """
         return self._root.weight
 
-    def __iter__(self, as_str: bool = True) -> iter:
+    def __iter__(self, as_json: bool = False) -> iter:
         """
         Iterator for stored leaves.
         Allows `for x in self` syntax.
@@ -591,19 +638,19 @@ class MRBT:
 
         Parameters
         ----------
-        as_str : bool, default True
-
+        as_json : bool, default False
+            Whether to return json object or string.
 
         Yields
         ------
         str
-            Key-value str json object of next element in order if as_str is True.
+            Key-value str json object of next element in order if as_json is True.
         dict
-            Key-value dict json object of next element in order if as_srt is False.
+            Key-value dict json object of next element in order if as_json is False.
 
         Examples
         --------
-        >>> a = MRBT.from_list([(1, "one"),
+        >>> a = MRBT.from_iter([(1, "one"),
         ...                     (4, "four"),
         ...                     (5, "five")])
         >>> for item in a:
@@ -616,7 +663,7 @@ class MRBT:
         node = next(iterator)
         while node is not None:
             res = {"key": node.key, "value": node.val}
-            if as_str:
+            if as_json:
                 yield json.dumps(res)
             else:
                 yield res
@@ -664,6 +711,7 @@ class MRBT:
         """
         Set value stored by the key or insert it if key doesn't exist.
         Allows `self[key] = val` syntax.
+        `set` method analogue.
         O(log n).
 
         Parameters
@@ -673,14 +721,7 @@ class MRBT:
         val : object
             Value to store by that key, must be json-serializable.
         """
-        found, search_result = self._search(key, pair=True)
-        if not found:
-            return self.insert(key, val)
-        focus = search_result[-1]
-        focus.store(val)
-        while focus is not None:
-            self._update_digest(focus)
-            focus = focus.parent
+        self.set(key, val)
 
     def __eq__(self, other) -> bool:
         """
@@ -747,22 +788,16 @@ class MRBT:
             node.weight = node[0].weight + node[1].weight
         node.digest = self._calc_digest(node)
 
-    def _search(self, key: int, pair: bool = False):
+    def _search(self, key: int):
         focus = self._root
-        found = True
-        res = []
         while focus.color != NIL:
             if key == focus.key:
-                res.append(focus)
-                if not pair:
-                    return True, res
-            if key <= focus.key:
+                return True, focus
+            if key < focus.key:
                 focus = focus[0]
             elif key > focus.key:
                 focus = focus[1]
-        res.append(focus)
-        found = (key == focus.key)
-        return found, res
+        return False, focus
 
     def _rotate(self, node: Node):
         direction = node.is_left_child()
@@ -866,7 +901,39 @@ class MRBT:
             self._update_digest(focus)
             focus = focus.parent
 
-    def test(self):
+    def _get_change_set__legacy(self, other, as_json: bool = False):
+        """
+        Exact O(n + k) implementation.
+        """
+        res = []
+        iterator = [["Source", self._iter()],
+                    ["Destination", other._iter()]]
+        nodes = [next(iterator[0][1]), next(iterator[1][1])]
+        while nodes[0] is not None or nodes[1] is not None:
+            direction = -1
+            if nodes[0] is None:
+                nodes[0], nodes[1] = nodes[1], nodes[0]
+                iterator[0], iterator[1] = iterator[1], iterator[0]
+            if nodes[1] is None:
+                direction = 0
+            elif nodes[0].key < nodes[1].key:
+                direction = 0
+            elif nodes[0].key > nodes[1].key:
+                direction = 1
+            elif nodes[0].digest != nodes[1].digest:
+                direction = 1
+            if direction == -1:
+                nodes = [next(iterator[0][1]), next(iterator[1][1])]
+            else:
+                res.append([iterator[direction][0],
+                            {"key": nodes[direction].key,
+                             "value": nodes[direction].val}])
+                nodes[direction] = next(iterator[direction][1])
+        if as_json:
+            return json.dumps(res)
+        return res
+
+    def _test(self):
         """
         Test structure for:
             1. BST properties:
@@ -881,6 +948,7 @@ class MRBT:
                 - Digests consistency.
             4. Miscellaneous:
                 - Correct subtree size statistics.
+                - Shortcut consistency.
         O(n).
 
         Returns
@@ -942,6 +1010,10 @@ class MRBT:
                     elif len(left_border):
                         left_border.pop()
                 else:
+                    if focus.shortcut is None:
+                        return "Missing shortcut"
+                    if focus.shortcut.key != focus.key:
+                        return "Invalid shortcut"
                     right_border.append(focus.key)
                     focus = focus[0]
                     move = "D"
