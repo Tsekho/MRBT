@@ -18,7 +18,6 @@ General TODO:
 __all__ = ["MRBT", "verify"]
 
 import json
-import hashlib
 from math import inf as INF
 
 RED = "RED"
@@ -958,6 +957,7 @@ class MRBT:
             4. Miscellaneous:
                 - Correct subtree size statistics.
                 - Shortcut consistency.
+                - Doubly linked list consistency.
         O(n).
 
         Returns
@@ -977,6 +977,7 @@ class MRBT:
         move = "D"
         bbalance = 0
         bbalance_leaf = -1
+        prev_leaf = None
         while focus != None:
             if move == "D":
                 if focus.key == INF:
@@ -984,11 +985,24 @@ class MRBT:
                         return "INF has shortcut."
                     if focus.weight != 0:
                         return "INF has wrong weight."
+                    if focus.next is not None:
+                        return "Wrong next."
+                    if focus.prev is not prev_leaf:
+                        return "Wrong previous."
+                    if focus.prev is not None:
+                        if focus.prev.next is not focus:
+                            return "Wrong next."
                 elif focus.color == NIL:
                     if focus[0] is not None or focus[1] is not None:
                         return "Leaf has children."
                     if focus.weight != 1:
                         return "Leaf has wrong weight."
+                    if focus.prev is not prev_leaf:
+                        return "Wrong previous."
+                    if focus.prev is not None:
+                        if focus.prev.next is not focus:
+                            return "Wrong next."
+                    prev_leaf = focus
                 else:
                     if focus[0] is None or focus[1] is None:
                         return "Node misses child."
