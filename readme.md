@@ -71,8 +71,9 @@ authentication.
   - Returns `{'key': <key>, 'value': <value>}` `dict` if `as_json` is false, its json `str` otherwise.
   - Returns `None` if `k` is out of range.
 - `get_change_set(other, as_json=False)`
-  - Returns comparison result over other `MRBT` object in `[[<target>, {'key': <key>, 'value': <value>}], ...]` `list` format if `as_json` is false, its json `str` otherwise.
+  - Returns comparison result over `other` `MRBT` object in `[[<target>, {'key': <key>, 'value': <value>}], ...]` `list` format if `as_json` is false, its json `str` otherwise.
     - `<target>` is either `'Source'` for `self` or `'Destination'` for `other`, `<key>` and `<value>` is a point of difference (either key is unique to the collection or values differ).
+  - **!!!** Incorrect results rate is controlled by hash function choice.
 - `__len__()`
   - Allows `len(self)` for getting `size` attribute.
 - `__iter__(as_json=False)`
@@ -86,7 +87,8 @@ authentication.
   - Allows `self[key] = val` setting, updates `key` key value with `val` if key exists, inserts it otherwise, `val` must be json-serializable.
   - `set` method analogue.
 - `__eq__(other)`
-  - Allows `self == other` morphism checks. False positive rate is controlled by hash function choice.
+  - Allows `self == other` probabilistic morphism checks.
+  - **!!!** False positive rate is controlled by hash function choice.
 - `__str__(self)`
   - Allows `print(self)` printing for basic visualization.
 

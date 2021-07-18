@@ -536,6 +536,10 @@ class MRBT:
     def get_change_set(self, other, as_json: bool = False):
         """
         Get symmetric difference with other object of the class in json format.
+        !!! Relies on digests in order to skip equal subtrees.
+        ... False positive equals are extremely rare with proper
+        ... choice of hash function.
+        ... Correctness of return value is not guaranteed.
         O(n + o) w.c., O(k log n) for k << n insertions / deletions / modifications.
 
         Parameters
@@ -726,9 +730,9 @@ class MRBT:
     def __eq__(self, other) -> bool:
         """
         Check if other object of the class has different root digest.
-        A probabilistic way to compare if structures are equal.
-        False positives are extremely rare with proper
-        choice of hash function.
+        !!! A probabilistic way to compare if structures are equal.
+        ... False positives are extremely rare with proper
+        ... choice of hash function.
         Allows `self == other` syntax.
         O(1).
 
@@ -903,7 +907,7 @@ class MRBT:
 
     def _get_change_set__legacy(self, other, as_json: bool = False):
         """
-        Exact O(n + k) implementation.
+        Exact O(n + o) implementation.
         """
         res = []
         iterator = [["Source", self._iter()],
