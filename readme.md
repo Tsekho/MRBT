@@ -19,17 +19,22 @@ based on generic Red-Black Tree with Merkle augmentation.
 
 ## Theory
 
-
 | !["Red-Black Merkle Tree"](./_figures/fig1.png) |
 | :---------------------------------------------: |
 |    Red-Black Merkle Tree with fictive leaf.     |
 
 See the [original implementation](#references) for basic understanding.
 
-We added fictive leaf with infinity key to the original implementation. That way data structure acquires strict key bijection between internal nodes and leaves (each finite leaf has key of its closest ancestor in whose left subtree it lies).
+We added fictive leaf with infinity key to the original implementation. This way, data structure acquires strict key bijection between internal nodes and leaves: each finite leaf has key of its closest ancestor in whose left subtree it lies and each internal node has key of largest key in its left subtree.
 
 Data is stored in finite keyed leaves of Red-Black Tree. Each node has also a pair of digests similar to Merkle trees for data
 authentication.
+
+Additionally, leaves were linked with corresponding internal nodes
+and tied in doubly linked list for more efficient operations execution and better iteration over stored data.
+
+Merkle augmentation helps to identify equal subtrees which used
+in efficient difference estimation of similar structures.
 
 ## Usage
 
@@ -37,8 +42,8 @@ authentication.
 
 #### Constructors
 
-- `MRBT(hsh=sha256_dual)`
-  - `hsh` is a function used for Merkle augmentation, takes 2 `bytes` objects and returns their combined hash `bytes`.
+- `MRBT(hsh='sha256')`
+  - `hsh` is `str` name of base `hashlib` function (either of `'sha1'`, `'sha224'`, `'sha256'`, `'sha384'`, `'sha512'`, `'blake2b'` or `'blake2s'`) or custom function that takes 2 `bytes` objects and returns their combined hash `bytes`, used for Merkle augmentation.
 - `MRBT.from_iter(itr, **kwargs)`
   - `itr` is iterable of either keys (for `None` values) or key-value pairs for initial state, keys must be `int` and values must be json-serializable.
   - `**kwargs` are additional keywords passed to original constructor (only `hsh` keyword supported yet).
@@ -94,8 +99,8 @@ authentication.
 
 ### `verify` function
 
-- `verify(t, vo, hsh=sha256_dual)`
-  - Validation for verification object `vo`, trusted `MRBT` object `t` and same `hsh` dual argument hashing function. Returns `True` if validation passed, `False` otherwise.
+- `verify(t, vo, hsh='sha256')`
+  - Validation for verification object `vo`, trusted `MRBT` object `t` and same `hsh` option used in `t`. Returns `True` if validation passed, `False` otherwise.
 
 ## TODO
 

@@ -26,10 +26,6 @@ BLACK = "BLACK"
 NIL = "NIL"
 
 
-def sha256_dual(a: bytes, b: bytes) -> bytes:
-    return hashlib.sha256(a + b).digest()
-
-
 class Node:
     """
     MRBT node.
@@ -62,22 +58,13 @@ class Node:
         self.val = None
         self.digest = (bytes(), bytes())
         self.weight = 0
+        self.shortcut = None
+        if self.color == NIL:
+            self.next = None
+            self.prev = None
         if self.color == NIL and self.key != INF:
-            self.store(val)
+            self.val = val
             self.weight = 1
-        else:
-            self.shortcut = None
-
-    def store(self, val) -> None:
-        """
-        Update stored value.
-
-        Parameters
-        ----------
-        val : object
-            New value to store, must be json-serializable.
-        """
-        self.val = val
 
     def dump_key(self) -> bytes:
         """
@@ -144,8 +131,11 @@ class Node:
         bool
             Return True if node has parent and it's left child is node, False otherwise.
         """
-        return self.is_child() and self.parent.left is not None \
-            and self.parent.left is self
+        if self.parent is None:
+            return False
+        if self.parent.left is None:
+            return False
+        return self.parent.left is self
 
     def is_right_child(self) -> bool:
         """
@@ -156,8 +146,11 @@ class Node:
         bool
             Return True if node has parent and it's right child is node, False otherwise.
         """
-        return self.is_child() and self.parent.right is not None \
-            and self.parent.right is self
+        if self.parent is None:
+            return False
+        if self.parent.right is None:
+            return False
+        return self.parent.right is self
 
     def get_sibling(self):
         """
@@ -275,25 +268,49 @@ class MRBT:
 
     Parameters
     ----------
-    hsh : func(lhs: bytes, rhs: bytes) -> bytes, default sha256_dual
-        Dual argument hash function for node Merkle augmentation.
+    hsh : str or func(lhs: bytes, rhs: bytes) -> bytes, default "sha256"
+        Name of hashlib function (either of "sha1", "sha224", "sha256", "sha384", "sha512",
+        "blake2b" or "blake2s") or custom dual argument hash function
+        for node Merkle augmentation. Unrecognized names default to "sha256".
     """
 
-    def __init__(self, hsh=sha256_dual) -> None:
+    def __init__(self, hsh="sha256") -> None:
         self._root = Node(INF, NIL)
-        if hsh is not None:
-            def _calc_digest(node):
-                if node.color != NIL:
-                    lhs = node[0].digest
-                    rhs = node[1].digest
-                else:
-                    lhs = (node.dump_data(), bytes())
-                    rhs = (node.dump_key(), bytes())
-                return (hsh(*lhs), hsh(*rhs))
+        if isinstance(hsh, str):
+            if hsh == "sha1":
+                from hashlib import sha1
+                func = sha1
+            elif hsh == "sha224":
+                from hashlib import sha224
+                func = sha224
+            elif hsh == "sha384":
+                from hashlib import sha384
+                func = sha384
+            elif hsh == "sha512":
+                from hashlib import sha512
+                func = sha512
+            elif hsh == "blake2b":
+                from hashlib import blake2b
+                func = blake2b
+            elif hsh == "blake2s":
+                from hashlib import blake2s
+                func = blake2s
+            else:
+                from hashlib import sha256
+                func = sha256
 
-            self._calc_digest = _calc_digest
-        else:
-            self._calc_digest = lambda x: (bytes(), bytes())
+            def hsh(x, y): return func(x + y).digest()
+
+        def _calc_digest(node):
+            if node.color != NIL:
+                lhs = node[0].digest
+                rhs = node[1].digest
+            else:
+                lhs = (node.dump_data(), bytes())
+                rhs = (node.dump_key(), bytes())
+            return (hsh(*lhs), hsh(*rhs))
+
+        self._calc_digest = _calc_digest
         self._update_digest(self._root)
 
     @classmethod
@@ -378,7 +395,13 @@ class MRBT:
         insertion_node = Node(key, parent=focus.parent,
                               left=insertion_leaf, right=focus)
         insertion_node.shortcut = insertion_leaf
+        insertion_leaf.shortcut = insertion_node
         insertion_leaf.parent = insertion_node
+        insertion_leaf.prev = focus.prev
+        insertion_leaf.next = focus
+        focus.prev = insertion_leaf
+        if insertion_leaf.prev is not None:
+            insertion_leaf.prev.next = insertion_leaf
         if focus.is_root():
             self._root = insertion_node
         else:
@@ -402,8 +425,12 @@ class MRBT:
             return
 
         focus = search_result.shortcut
+        if focus.prev is not None:
+            focus.prev.next = focus.next
+        focus.next.prev = focus.prev
         search_result.key = focus.parent.key
         search_result.shortcut = focus.parent.shortcut
+        search_result.shortcut.shortcut = search_result
 
         parent = focus.parent
         sibling = focus.get_sibling()
@@ -482,7 +509,7 @@ class MRBT:
 
         focus = search_result.shortcut
 
-        focus.store(val)
+        focus.val = val
         while focus is not None:
             self._update_digest(focus)
             focus = focus.parent
@@ -568,51 +595,45 @@ class MRBT:
          ["Source", {"key": 2, "value": "two"}],
          ["Source", {"key": 5, "value": "five"}]]
         """
-        focus = [["Source", self._root], ["Destination", other._root]]
+        focus = [self._root, other._root]
         for i in range(2):
-            while focus[i][1][0] is not None:
-                focus[i][1] = focus[i][1][0]
-            focus[i][1] = focus[i][1].parent
+            while focus[i][0] is not None:
+                focus[i] = focus[i][0]
+            focus[i] = focus[i].parent
 
         res = []
 
         def _next(target, skip=False):
             nonlocal focus
-            if focus[target][1][1].color == NIL:
-                skip = True
             if skip:
-                while focus[target][1].is_right_child():
-                    focus[target][1] = focus[target][1].parent
-                focus[target][1] = focus[target][1].parent
+                while focus[target].is_right_child():
+                    focus[target] = focus[target].parent
+                focus[target] = focus[target].parent
             else:
-                focus[target][1] = focus[target][1][1]
-                while focus[target][1][0].color != NIL:
-                    focus[target][1] = focus[target][1][0]
+                focus[target] = focus[target].shortcut.next.shortcut
 
         def _write(target):
             nonlocal focus
-            res.append([focus[target][0],
-                        {"key": focus[target][1].shortcut.key,
-                         "value": focus[target][1].shortcut.val}])
+            res.append(["Destination" if target else "Source",
+                        {"key": focus[target].shortcut.key,
+                         "value": focus[target].shortcut.val}])
 
-        while not (focus[0][1] is None and focus[1][1] is None):
-            if focus[1][1] is None:
+        while not (focus[0] is None and focus[1] is None):
+            if focus[1] is None:
                 _write(0)
                 _next(0)
-            elif focus[0][1] is None:
+            elif focus[0] is None:
                 _write(1)
                 _next(1)
-            elif focus[0][1].key < focus[1][1].key:
-                _write(0)
-                _next(0)
-            elif focus[0][1].key > focus[1][1].key:
-                _write(1)
-                _next(1)
+            elif focus[0].key != focus[1].key:
+                target = int(focus[0].key > focus[1].key)
+                _write(target)
+                _next(target)
             else:
-                if focus[0][1].shortcut.digest != focus[1][1].shortcut.digest:
+                if focus[0].shortcut.digest != focus[1].shortcut.digest:
                     _write(0)
                     _write(1)
-                cut_allowed = (focus[0][1].digest[1] == focus[1][1].digest[1])
+                cut_allowed = (focus[0].digest[1] == focus[1].digest[1])
                 _next(0, skip=cut_allowed)
                 _next(1, skip=cut_allowed)
 
@@ -638,7 +659,7 @@ class MRBT:
         Iterator for stored leaves.
         Allows `for x in self` syntax.
         DFS implementation, next element in
-        O(log n) w.c., O(1) amortized.
+        O(1).
 
         Parameters
         ----------
@@ -763,29 +784,13 @@ class MRBT:
 
     def _iter(self):
         focus = self._root
-        from_left = True
-        move = "D"
-        while focus != None:
-            if move == "D":
-                if focus.color == NIL:
-                    if focus.key == INF:
-                        yield None
-                        return
-                    yield focus
-                    move = "U"
-                    from_left = focus.is_left_child()
-                    focus = focus.parent
-                else:
-                    focus = focus[0]
-                    move = "D"
-            else:
-                if from_left:
-                    focus = focus[1]
-                    move = "D"
-                else:
-                    move = "U"
-                    from_left = focus.is_left_child()
-                    focus = focus.parent
+        while focus[0] is not None:
+            focus = focus[0]
+        while focus.key != INF:
+            yield focus
+            focus = focus.next
+        yield None
+        return
 
     def _update_digest(self, node: Node) -> None:
         if node.color != NIL:
@@ -974,11 +979,15 @@ class MRBT:
         bbalance_leaf = -1
         while focus != None:
             if move == "D":
-                if focus.color == NIL:
+                if focus.key == INF:
+                    if focus.shortcut is not None:
+                        return "INF has shortcut."
+                    if focus.weight != 0:
+                        return "INF has wrong weight."
+                elif focus.color == NIL:
                     if focus[0] is not None or focus[1] is not None:
                         return "Leaf has children."
-                    if (focus.key != INF and focus.weight != 1) or \
-                       (focus.key == INF and focus.weight != 0):
+                    if focus.weight != 1:
                         return "Leaf has wrong weight."
                 else:
                     if focus[0] is None or focus[1] is None:
@@ -989,6 +998,14 @@ class MRBT:
                         return "Child has no parent."
                     if focus[0].parent is not focus or focus[1].parent is not focus:
                         return "Child doesn't recognize parent."
+                if focus.key != INF:
+                    if focus.shortcut is None:
+                        return "Missing shortcut."
+                    if focus.shortcut.shortcut is None:
+                        return "Missing back shortcut."
+                    if focus.shortcut.shortcut is not focus:
+                        return "Invalid back shortcut."
+
                 if len(left_border) and focus.key <= left_border[-1]:
                     return "Child violated keys order."
                 if len(right_border) and focus.key > right_border[-1]:
@@ -1014,10 +1031,6 @@ class MRBT:
                     elif len(left_border):
                         left_border.pop()
                 else:
-                    if focus.shortcut is None:
-                        return "Missing shortcut"
-                    if focus.shortcut.key != focus.key:
-                        return "Invalid shortcut"
                     right_border.append(focus.key)
                     focus = focus[0]
                     move = "D"
@@ -1040,7 +1053,7 @@ class MRBT:
         return None
 
 
-def verify(t: MRBT, vo: tuple, hsh=sha256_dual):
+def verify(t: MRBT, vo: tuple, hsh="sha256"):
     """
     Validate verification object
 
@@ -1050,15 +1063,42 @@ def verify(t: MRBT, vo: tuple, hsh=sha256_dual):
         Trusted structure.
     vo : tuple
         Verification object.
-    hsh : func(lhs: bytes, rhs: bytes) -> bytes
-        Dual argument hash function used in configuration
-        for node Merkle augmentation.
+    hsh : str or func(lhs: bytes, rhs: bytes) -> bytes, default "sha256"
+        Name of hashlib function (either of "sha1", "sha224", "sha256", "sha384", "sha512",
+        "blake2b" or "blake2s") or custom dual argument hash function
+        for node Merkle augmentation. Unrecognized names default to "sha256". Should be same
+        as in original tree.
 
     Returns
     -------
     bool
         True if validation succeeded, False otherwise.
     """
+    if isinstance(hsh, str):
+        if hsh == "sha1":
+            from hashlib import sha1
+            func = sha1
+        elif hsh == "sha224":
+            from hashlib import sha224
+            func = sha224
+        elif hsh == "sha384":
+            from hashlib import sha384
+            func = sha384
+        elif hsh == "sha512":
+            from hashlib import sha512
+            func = sha512
+        elif hsh == "blake2b":
+            from hashlib import blake2b
+            func = blake2b
+        elif hsh == "blake2s":
+            from hashlib import blake2s
+            func = blake2s
+        else:
+            from hashlib import sha256
+            func = sha256
+
+        def hsh(x, y): return func(x + y).digest()
+
     if t.digest != vo[-1]:
         return False
     for i in range(len(vo) - 1):
