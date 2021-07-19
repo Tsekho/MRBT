@@ -3,15 +3,15 @@ MRBT (Red-Black Merkle Tree)
 ---------
 An efficient authenticated data structure
 based on generic Red-Black Tree with Merkle augmentation.
+Explicit repository at https://github.com/Tsekho/MRBT/.
 
 Original Python 2 implementation:
-    Andrew Miller.
-    https://github.com/amiller/redblackmerkle
+    Andrew Miller
+    https://github.com/amiller/redblackmerkle.
 
 General TODO:
     1. Clean the code up.
     2. Decide whether code should raise exceptions.
-    3. Typing corrections.
 """
 
 
