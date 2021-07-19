@@ -54,13 +54,13 @@ class Node:
         self.right = right
         self.key = key
 
-        self.val = None
-        self.digest = (bytes(), bytes())
-        self.weight = 0
-        self.shortcut = None
+        self.val = None  # stored value
+        self.digest = (bytes(), bytes())  # pair of chilren digests
+        self.weight = 0  # number of data points stored under the node
+        self.shortcut = None  # dual-way link between internal node and corresponding leaf
         if self.color == NIL:
-            self.next = None
-            self.prev = None
+            self.next = None  # next leaf in ascending keys order doubly linked list
+            self.prev = None  # previous leaf in ascending keys order doubly linked list
         if self.color == NIL and self.key != INF:
             self.val = val
             self.weight = 1
@@ -309,7 +309,9 @@ class MRBT:
                 rhs = (node.dump_key(), bytes())
             return (hsh(*lhs), hsh(*rhs))
 
+        # Calculates node's correct digest (either from children or key and value).
         self._calc_digest = _calc_digest
+
         self._update_digest(self._root)
 
     @classmethod
@@ -594,6 +596,9 @@ class MRBT:
          ["Source", {"key": 2, "value": "two"}],
          ["Source", {"key": 5, "value": "five"}]]
         """
+        # Two pointers iterating over internal nodes in ascending keys order.
+        # Equal right subtrees are skipped.
+        # Equal keys are checked for equal data with shortcuts to corresponding leaves.
         focus = [self._root, other._root]
         for i in range(2):
             while focus[i][0] is not None:
@@ -602,6 +607,7 @@ class MRBT:
 
         res = []
 
+        # Controls iteration and skips.
         def _next(target, skip=False):
             nonlocal focus
             if skip:
@@ -611,6 +617,7 @@ class MRBT:
             else:
                 focus[target] = focus[target].shortcut.next.shortcut
 
+        # Writes to the result.
         def _write(target):
             nonlocal focus
             res.append(["Destination" if target else "Source",
@@ -782,6 +789,8 @@ class MRBT:
         return self._root.__str__()
 
     def _iter(self):
+        # Yields leaves in ascending keys order.
+        # Yields None before terminating.
         focus = self._root
         while focus[0] is not None:
             focus = focus[0]
@@ -792,11 +801,14 @@ class MRBT:
         return
 
     def _update_digest(self, node: Node) -> None:
+        # Updates node's weight and digest.
         if node.color != NIL:
             node.weight = node[0].weight + node[1].weight
         node.digest = self._calc_digest(node)
 
     def _search(self, key: int):
+        # Returns either True and internal node with key requested
+        # or False and terminating leaf.
         focus = self._root
         while focus.color != NIL:
             if key == focus.key:
@@ -808,6 +820,7 @@ class MRBT:
         return False, focus
 
     def _rotate(self, node: Node):
+        # RBT generic rotation. Rotates node's parent in corresponding direction.
         direction = node.is_left_child()
         parent = node.parent
         subtree = node[direction] if node.color != NIL else None
@@ -826,6 +839,8 @@ class MRBT:
             subtree.parent = parent
 
     def _insert_fix(self, focus: Node) -> None:
+        # RBT generic insertion balancing routines.
+        # Updates weights and digests on the way.
         self._update_digest(focus[0])
 
         while focus.is_child() and focus.parent.color == RED:
@@ -862,6 +877,8 @@ class MRBT:
             focus = focus.parent
 
     def _delete_fix(self, focus: Node, d_black: bool = False) -> None:
+        # RBT generic deletion balancing routines.
+        # Updates weights and digests on the way.
         while d_black:
             direction = int(focus.is_left_child())
             P = focus.parent
@@ -913,6 +930,7 @@ class MRBT:
         """
         Exact O(n + o) implementation.
         """
+        # Two pointers iterating over leaves in ascending keys order.
         res = []
         iterator = [["Source", self._iter()],
                     ["Destination", other._iter()]]
@@ -967,6 +985,8 @@ class MRBT:
         None
             If structure test passed.
         """
+        # BST non-recursive DFS iteration.
+        # Checks pretty much everything about links, weights and digests.
         if self._root.color == RED:
             return "Root is red."
         focus = self._root
@@ -1067,21 +1087,21 @@ class MRBT:
         return None
 
 
-def verify(t: MRBT, vo: tuple, hsh="sha256"):
+def verify(trusted_digest: tuple, vo: tuple, hsh="sha256"):
     """
     Validate verification object
 
     Parameters
     ----------
-    t : MRBT
-        Trusted structure.
+    trusted_digest : tuple
+        Trusted structure digest.
     vo : tuple
         Verification object.
     hsh : str or func(lhs: bytes, rhs: bytes) -> bytes, default "sha256"
         Name of hashlib function (either of "sha1", "sha224", "sha256", "sha384", "sha512",
         "blake2b" or "blake2s") or custom dual argument hash function
-        for node Merkle augmentation. Unrecognized names default to "sha256". Should be same
-        as in original tree.
+        for node Merkle augmentation. Unrecognized names default to "sha256".
+        Should be the same as one passed to original structure constructor.
 
     Returns
     -------
@@ -1113,7 +1133,7 @@ def verify(t: MRBT, vo: tuple, hsh="sha256"):
 
         def hsh(x, y): return func(x + y).digest()
 
-    if t.digest != vo[-1]:
+    if trusted_digest != vo[-1]:
         return False
     for i in range(len(vo) - 1):
         if hsh(*vo[i]) not in vo[i + 1]:
