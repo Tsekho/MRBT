@@ -140,7 +140,7 @@ in efficient difference estimation of similar structures.
 
 ## References
 
-- [1] Original Python 2 implementation:
+- \[1\] Original Python 2 implementation:
   - [Red-Black Merkle Tree](https://github.com/amiller/redblackmerkle) - Andrew Miller (2012).
 
 [1]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L264-L1087  "MRBT class"
