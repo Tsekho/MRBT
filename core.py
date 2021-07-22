@@ -20,9 +20,16 @@ __all__ = ["MRBT", "verify"]
 import json
 from math import inf as INF
 
-RED = "RED"
-BLACK = "BLACK"
-NIL = "NIL"
+
+def enum(*sequential, **named):
+    """
+    Easier enumeration
+    """
+    enums = dict(zip(sequential, range(len(sequential))), **named)
+    return type("Enum", (), enums)
+
+
+COL = enum("RED", "BLACK", "NIL")
 
 
 class Node:
@@ -33,8 +40,8 @@ class Node:
     ----------
     key : int or float
         Stored key for search.
-    color : str, default "RED"
-        Either of "RED", "BLACK" or "NIL", represents node's color.
+    color : str, default "COL.RED"
+        Either of "COL.RED", "COL.BLACK" or "COL.NIL", represents node's color.
     parent : Node or None, default None
         Parent Node.
     left : Node or None, default None
@@ -45,7 +52,7 @@ class Node:
         Stored data, must be json-serializable.
     """
 
-    def __init__(self, key, color=RED,
+    def __init__(self, key, color=COL.RED,
                  parent=None, left=None, right=None,
                  val=None) -> None:
         self.color = color
@@ -58,10 +65,10 @@ class Node:
         self.digest = (bytes(), bytes())  # pair of chilren digests
         self.weight = 0  # number of data points stored under the node
         self.shortcut = None  # dual-way link between internal node and corresponding leaf
-        if self.color == NIL:
+        if self.color == COL.NIL:
             self.next = None  # next leaf in ascending keys order doubly linked list
             self.prev = None  # previous leaf in ascending keys order doubly linked list
-        if self.color == NIL and self.key != INF:
+        if self.color == COL.NIL and self.key != INF:
             self.val = val
             self.weight = 1
 
@@ -209,10 +216,11 @@ class Node:
         str
             Node's recursive string representation.
         """
-        b = "()" if self.color != NIL else "[]"
+        b = "()" if self.color != COL.NIL else "[]"
+        c = "RBN"
         res = _indent[:-2] + " ⎣" + \
-            "{} {}\n".format(b[0] + self.color[0] + b[1], self.key)
-        if self.color != NIL:
+            "{} {}\n".format(b[0] + c[self.color] + b[1], self.key)
+        if self.color != COL.NIL:
             res += self.right.__str__(_indent + " |")
             res += self.left.__str__(_indent + "  ")
         return res
@@ -274,14 +282,18 @@ class MRBT:
     """
 
     def __init__(self, hsh="sha256") -> None:
-        self._root = Node(INF, NIL)
-        if isinstance(hsh, str):
+        self._root = Node(INF, COL.NIL)
+        if hsh in ["sha1", "sha224", "sha256", "sha384",
+                   "sha512", "blake2b", "blake2s", "blake3"]:
             if hsh == "sha1":
                 from hashlib import sha1
                 func = sha1
             elif hsh == "sha224":
                 from hashlib import sha224
                 func = sha224
+            elif hsh == "sha256":
+                from hashlib import sha256
+                func = sha256
             elif hsh == "sha384":
                 from hashlib import sha384
                 func = sha384
@@ -294,14 +306,14 @@ class MRBT:
             elif hsh == "blake2s":
                 from hashlib import blake2s
                 func = blake2s
-            else:
-                from hashlib import sha256
-                func = sha256
+            elif hsh == "blake3":
+                from blake3 import blake3
+                func = blake3
 
             def hsh(x, y): return func(x + y).digest()
 
         def _calc_digest(node):
-            if node.color != NIL:
+            if node.color != COL.NIL:
                 lhs = node[0].digest
                 rhs = node[1].digest
             else:
@@ -392,7 +404,7 @@ class MRBT:
         focus = search_result
         direction = focus.is_left_child()
 
-        insertion_leaf = Node(key, NIL, val=val)
+        insertion_leaf = Node(key, COL.NIL, val=val)
         insertion_node = Node(key, parent=focus.parent,
                               left=insertion_leaf, right=focus)
         insertion_node.shortcut = insertion_leaf
@@ -436,7 +448,7 @@ class MRBT:
         parent = focus.parent
         sibling = focus.get_sibling()
 
-        d_black = (parent.color != RED) and (sibling.color != RED)
+        d_black = (parent.color != COL.RED) and (sibling.color != COL.RED)
 
         if parent.is_root():
             self._root = sibling
@@ -445,8 +457,8 @@ class MRBT:
             parent.parent[1 - direction_1] = sibling
         sibling.parent = parent.parent
 
-        if sibling.color == RED:
-            sibling.color = BLACK
+        if sibling.color == COL.RED:
+            sibling.color = COL.BLACK
 
         self._delete_fix(sibling, d_black)
 
@@ -550,7 +562,7 @@ class MRBT:
         if k < 0:
             k = self.__len__() + k
         focus = self._root
-        while focus.color != NIL:
+        while focus.color != COL.NIL:
             if k < focus[0].weight:
                 focus = focus[0]
             else:
@@ -568,7 +580,7 @@ class MRBT:
         ... False positive equals are extremely rare with proper
         ... choice of hash function.
         ... Correctness of return value is not guaranteed.
-        O(n + o) w.c., O(k log n) for k << n insertions / deletions / modifications.
+        O(n + o) w.c., O(k log2 n) for k << n insertions / deletions / modifications.
 
         Parameters
         ----------
@@ -802,7 +814,7 @@ class MRBT:
 
     def _update_digest(self, node: Node) -> None:
         # Updates node's weight and digest.
-        if node.color != NIL:
+        if node.color != COL.NIL:
             node.weight = node[0].weight + node[1].weight
         node.digest = self._calc_digest(node)
 
@@ -810,7 +822,7 @@ class MRBT:
         # Returns either True and internal node with key requested
         # or False and terminating leaf.
         focus = self._root
-        while focus.color != NIL:
+        while focus.color != COL.NIL:
             if key == focus.key:
                 return True, focus
             if key < focus.key:
@@ -823,7 +835,7 @@ class MRBT:
         # RBT generic rotation. Rotates node's parent in corresponding direction.
         direction = node.is_left_child()
         parent = node.parent
-        subtree = node[direction] if node.color != NIL else None
+        subtree = node[direction] if node.color != COL.NIL else None
 
         if parent.is_root():
             self._root = node
@@ -843,17 +855,17 @@ class MRBT:
         # Updates weights and digests on the way.
         self._update_digest(focus[0])
 
-        while focus.is_child() and focus.parent.color == RED:
+        while focus.is_child() and focus.parent.color == COL.RED:
             P = focus.parent
             G = focus.get_grandparent()
             U = focus.get_uncle()
             if G is None:
-                P.color = BLACK
+                P.color = COL.BLACK
                 continue
-            if U.color == RED:  # CASE 1
-                P.color = BLACK
-                U.color = BLACK
-                G.color = RED
+            if U.color == COL.RED:  # CASE 1
+                P.color = COL.BLACK
+                U.color = COL.BLACK
+                G.color = COL.RED
                 self._update_digest(focus)
                 self._update_digest(P)
                 focus = G
@@ -866,11 +878,11 @@ class MRBT:
                 self._update_digest(focus)
                 self._rotate(P)
                 focus = G
-                P.color = BLACK
-                G.color = RED
+                P.color = COL.BLACK
+                G.color = COL.RED
                 continue
-        if self._root.color == RED:
-            self._root.color = BLACK  # CASE 0
+        if self._root.color == COL.RED:
+            self._root.color = COL.BLACK  # CASE 0
 
         while focus is not None:
             self._update_digest(focus)
@@ -883,41 +895,41 @@ class MRBT:
             direction = int(focus.is_left_child())
             P = focus.parent
             S = focus.get_sibling()
-            if S is not None and S.color != NIL:
+            if S is not None and S.color != COL.NIL:
                 Sc = [S[0], S[1]]
 
             if P is None:  # CASE 1
                 d_black = False
                 continue
-            if S.color == RED:  # CASE 2
+            if S.color == COL.RED:  # CASE 2
                 self._rotate(S)
-                S.color = BLACK
-                P.color = RED
+                S.color = COL.BLACK
+                P.color = COL.RED
                 continue
-            if P.color == BLACK and S.color == BLACK:
-                if Sc[0].color != RED and Sc[1].color != RED:  # CASE 3
-                    S.color = RED
+            if P.color == COL.BLACK and S.color == COL.BLACK:
+                if Sc[0].color != COL.RED and Sc[1].color != COL.RED:  # CASE 3
+                    S.color = COL.RED
                     self._update_digest(focus)
                     focus = P
                     continue
-            if P.color == RED:
-                if Sc[0].color != RED and Sc[1].color != RED:  # CASE 4
-                    P.color = BLACK
-                    S.color = RED
+            if P.color == COL.RED:
+                if Sc[0].color != COL.RED and Sc[1].color != COL.RED:  # CASE 4
+                    P.color = COL.BLACK
+                    S.color = COL.RED
                     d_black = False
                     continue
-            if S.color == BLACK:
-                if Sc[direction].color == RED:  # CASE 6
+            if S.color == COL.BLACK:
+                if Sc[direction].color == COL.RED:  # CASE 6
                     self._rotate(S)
                     S.color = P.color
-                    P.color = BLACK
-                    Sc[direction].color = BLACK
+                    P.color = COL.BLACK
+                    Sc[direction].color = COL.BLACK
                     d_black = False
                     continue
-                if Sc[1 - direction].color == RED:  # CASE 5
+                if Sc[1 - direction].color == COL.RED:  # CASE 5
                     self._rotate(S[1 - direction])
-                    Sc[1 - direction].color = BLACK
-                    S.color = RED
+                    Sc[1 - direction].color = COL.BLACK
+                    S.color = COL.RED
                     self._update_digest(S)
                     self._update_digest(Sc[1 - direction])
                     continue
@@ -959,133 +971,6 @@ class MRBT:
             return json.dumps(res)
         return res
 
-    def _test(self):
-        """
-        Test structure for:
-            1. BST properties:
-                - Correct keys ordering.
-                - Linkage consistency.
-                - Each node either leaf or has 2 children.
-            2. RBT properties:
-                - Black root.
-                - Constant black depth.
-                - Absence of red-red relationships.
-            3. Merkle properties:
-                - Digests consistency.
-            4. Miscellaneous:
-                - Correct subtree size statistics.
-                - Shortcut consistency.
-                - Doubly linked list consistency.
-        O(n).
-
-        Returns
-        -------
-        str
-            Message if a problem has been encountered.
-        None
-            If structure test passed.
-        """
-        # BST non-recursive DFS iteration.
-        # Checks pretty much everything about links, weights and digests.
-        if self._root.color == RED:
-            return "Root is red."
-        focus = self._root
-        left_border = []
-        right_border = []
-        last_not_red = True
-        from_left = True
-        move = "D"
-        bbalance = 0
-        bbalance_leaf = -1
-        prev_leaf = None
-        while focus != None:
-            if move == "D":
-                if focus.key == INF:
-                    if focus.shortcut is not None:
-                        return "INF has shortcut."
-                    if focus.weight != 0:
-                        return "INF has wrong weight."
-                    if focus.next is not None:
-                        return "Wrong next."
-                    if focus.prev is not prev_leaf:
-                        return "Wrong previous."
-                    if focus.prev is not None:
-                        if focus.prev.next is not focus:
-                            return "Wrong next."
-                elif focus.color == NIL:
-                    if focus[0] is not None or focus[1] is not None:
-                        return "Leaf has children."
-                    if focus.weight != 1:
-                        return "Leaf has wrong weight."
-                    if focus.prev is not prev_leaf:
-                        return "Wrong previous."
-                    if focus.prev is not None:
-                        if focus.prev.next is not focus:
-                            return "Wrong next."
-                    prev_leaf = focus
-                else:
-                    if focus[0] is None or focus[1] is None:
-                        return "Node misses child."
-                    if focus.weight != focus[0].weight + focus[1].weight:
-                        return "Node has wrong leaf."
-                    if not focus[0].is_child() or not focus[1].is_child():
-                        return "Child has no parent."
-                    if focus[0].parent is not focus or focus[1].parent is not focus:
-                        return "Child doesn't recognize parent."
-                if focus.key != INF:
-                    if focus.shortcut is None:
-                        return "Missing shortcut."
-                    if focus.shortcut.shortcut is None:
-                        return "Missing back shortcut."
-                    if focus.shortcut.shortcut is not focus:
-                        return "Invalid back shortcut."
-
-                if len(left_border) and focus.key <= left_border[-1]:
-                    return "Child violated keys order."
-                if len(right_border) and focus.key > right_border[-1]:
-                    return "Child violated keys order."
-                if focus.digest != self._calc_digest(focus):
-                    return "Digests are wrong."
-                if focus.color != RED:
-                    bbalance += 1
-                else:
-                    if not last_not_red:
-                        return "Red-red relationship."
-                last_not_red = (focus.color != RED)
-                if focus.color == NIL:
-                    if bbalance_leaf == -1:
-                        bbalance_leaf = bbalance
-                    if bbalance != bbalance_leaf:
-                        return "Black depth is inconsistent."
-                    from_left = focus.is_left_child()
-                    focus = focus.parent
-                    move = "U"
-                    if from_left and len(right_border):
-                        right_border.pop()
-                    elif len(left_border):
-                        left_border.pop()
-                else:
-                    right_border.append(focus.key)
-                    focus = focus[0]
-                    move = "D"
-            else:
-                if last_not_red:
-                    bbalance -= 1
-                last_not_red = (focus.color != RED)
-                if from_left:
-                    left_border.append(focus.key)
-                    focus = focus[1]
-                    move = "D"
-                else:
-                    from_left = focus.is_left_child()
-                    focus = focus.parent
-                    move = "U"
-                    if from_left and len(right_border):
-                        right_border.pop()
-                    elif len(left_border):
-                        left_border.pop()
-        return None
-
 
 def verify(trusted_digest: tuple, vo: tuple, hsh="sha256"):
     """
@@ -1108,13 +993,17 @@ def verify(trusted_digest: tuple, vo: tuple, hsh="sha256"):
     bool
         True if validation succeeded, False otherwise.
     """
-    if isinstance(hsh, str):
+    if hsh in ["sha1", "sha224", "sha256", "sha384",
+               "sha512", "blake2b", "blake2s", "blake3"]:
         if hsh == "sha1":
             from hashlib import sha1
             func = sha1
         elif hsh == "sha224":
             from hashlib import sha224
             func = sha224
+        elif hsh == "sha256":
+            from hashlib import sha256
+            func = sha256
         elif hsh == "sha384":
             from hashlib import sha384
             func = sha384
@@ -1127,9 +1016,9 @@ def verify(trusted_digest: tuple, vo: tuple, hsh="sha256"):
         elif hsh == "blake2s":
             from hashlib import blake2s
             func = blake2s
-        else:
-            from hashlib import sha256
-            func = sha256
+        elif hsh == "blake3":
+            from blake3 import blake3
+            func = blake3
 
         def hsh(x, y): return func(x + y).digest()
 

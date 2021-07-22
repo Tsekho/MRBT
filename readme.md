@@ -45,6 +45,7 @@ in efficient difference estimation of similar structures.
 ## Requirements
 
 - `pytest >= 6.2.4`
+- `blake3 >= 0.2.0`
 - `python_version >= '3.7'`
 
 ## Usage
@@ -143,25 +144,25 @@ in efficient difference estimation of similar structures.
 - \[1\] Original Python 2 implementation:
   - [Red-Black Merkle Tree](https://github.com/amiller/redblackmerkle) - Andrew Miller (2012).
 
-[1]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L264-L1087  "MRBT class"
-[2]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L276-L315   "MRBT.__init__"
-[3]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L317-L336   "MRBT.from_iter"
-[4]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L338-L354   "MRBT.from_dict"
-[5]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L356-L364   "MRBT.size"
-[6]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L366-L374   "MRBT.digest"
-[7]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L376-L412   "MRBT.insert"
-[8]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L414-L451   "MRBT.delete"
-[9]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L453-L493   "MRBT.get"
-[10]: https://github.com/Tsekho/MRBT/blob/main/core.py#L495-L516   "MRBT.set"
-[11]: https://github.com/Tsekho/MRBT/blob/main/core.py#L518-L562   "MRBT.by_keys_order"
-[12]: https://github.com/Tsekho/MRBT/blob/main/core.py#L564-L648   "MRBT.get_change_set"
-[13]: https://github.com/Tsekho/MRBT/blob/main/core.py#L650-L661   "MRBT.__len__"
-[14]: https://github.com/Tsekho/MRBT/blob/main/core.py#L663-L702   "MRBT.__iter__"
-[15]: https://github.com/Tsekho/MRBT/blob/main/core.py#L704-L719   "MRBT.__contains__"
-[16]: https://github.com/Tsekho/MRBT/blob/main/core.py#L721-L739   "MRBT.__getitem__"
-[17]: https://github.com/Tsekho/MRBT/blob/main/core.py#L741-L755   "MRBT.__setitem__"
-[18]: https://github.com/Tsekho/MRBT/blob/main/core.py#L757-L776   "MRBT.__eq__"
-[19]: https://github.com/Tsekho/MRBT/blob/main/core.py#L778-L789   "MRBT.__str__"
+[1]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L272-L972   "MRBT class"
+[2]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L284-L327   "MRBT.__init__"
+[3]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L329-L348   "MRBT.from_iter"
+[4]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L350-L366   "MRBT.from_dict"
+[5]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L368-L376   "MRBT.size"
+[6]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L378-L386   "MRBT.digest"
+[7]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L388-L424   "MRBT.insert"
+[8]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L426-L463   "MRBT.delete"
+[9]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L465-L505   "MRBT.get"
+[10]: https://github.com/Tsekho/MRBT/blob/main/core.py#L507-L528   "MRBT.set"
+[11]: https://github.com/Tsekho/MRBT/blob/main/core.py#L530-L574   "MRBT.by_keys_order"
+[12]: https://github.com/Tsekho/MRBT/blob/main/core.py#L576-L660   "MRBT.get_change_set"
+[13]: https://github.com/Tsekho/MRBT/blob/main/core.py#L662-L673   "MRBT.__len__"
+[14]: https://github.com/Tsekho/MRBT/blob/main/core.py#L675-L714   "MRBT.__iter__"
+[15]: https://github.com/Tsekho/MRBT/blob/main/core.py#L716-L731   "MRBT.__contains__"
+[16]: https://github.com/Tsekho/MRBT/blob/main/core.py#L733-L751   "MRBT.__getitem__"
+[17]: https://github.com/Tsekho/MRBT/blob/main/core.py#L753-L767   "MRBT.__setitem__"
+[18]: https://github.com/Tsekho/MRBT/blob/main/core.py#L769-L788   "MRBT.__eq__"
+[19]: https://github.com/Tsekho/MRBT/blob/main/core.py#L790-L801   "MRBT.__str__"
 
-[20]: https://github.com/Tsekho/MRBT/blob/main/core.py#L1090-L1141 "verify function"
-[21]: https://github.com/Tsekho/MRBT/blob/main/core.py#L1090-L1141 "verify"
+[20]: https://github.com/Tsekho/MRBT/blob/main/core.py#L975-L1030 "verify function"
+[21]: https://github.com/Tsekho/MRBT/blob/main/core.py#L975-L1030 "verify"
