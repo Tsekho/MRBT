@@ -39,8 +39,8 @@ Additionally, leaves were linked with corresponding internal nodes and
 tied in doubly linked list for more efficient operations execution and
 better iteration over stored data.
 
-Merkle augmentation helps to identify equal subtrees which used
-in efficient difference estimation of similar structures.
+Merkle augmentation and RBT invariant are used for efficient container
+difference estimation, allowing us to cut equal subtrees completely.
 
 ## Requirements
 
@@ -138,31 +138,32 @@ in efficient difference estimation of similar structures.
 ## TODO
 
 - Clean the code up.
+- Decide whether the code should raise exceptions.
 
 ## References
 
 - \[1\] Original Python 2 implementation:
   - [Red-Black Merkle Tree](https://github.com/amiller/redblackmerkle) - Andrew Miller (2012).
 
-[1]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L272-L972   "MRBT class"
-[2]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L284-L327   "MRBT.__init__"
-[3]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L329-L348   "MRBT.from_iter"
-[4]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L350-L366   "MRBT.from_dict"
-[5]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L368-L376   "MRBT.size"
-[6]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L378-L386   "MRBT.digest"
-[7]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L388-L424   "MRBT.insert"
-[8]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L426-L463   "MRBT.delete"
-[9]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L465-L505   "MRBT.get"
-[10]: https://github.com/Tsekho/MRBT/blob/main/core.py#L507-L528   "MRBT.set"
-[11]: https://github.com/Tsekho/MRBT/blob/main/core.py#L530-L574   "MRBT.by_keys_order"
-[12]: https://github.com/Tsekho/MRBT/blob/main/core.py#L576-L660   "MRBT.get_change_set"
-[13]: https://github.com/Tsekho/MRBT/blob/main/core.py#L662-L673   "MRBT.__len__"
-[14]: https://github.com/Tsekho/MRBT/blob/main/core.py#L675-L714   "MRBT.__iter__"
-[15]: https://github.com/Tsekho/MRBT/blob/main/core.py#L716-L731   "MRBT.__contains__"
-[16]: https://github.com/Tsekho/MRBT/blob/main/core.py#L733-L751   "MRBT.__getitem__"
-[17]: https://github.com/Tsekho/MRBT/blob/main/core.py#L753-L767   "MRBT.__setitem__"
-[18]: https://github.com/Tsekho/MRBT/blob/main/core.py#L769-L788   "MRBT.__eq__"
-[19]: https://github.com/Tsekho/MRBT/blob/main/core.py#L790-L801   "MRBT.__str__"
+[1]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L275-L990   "MRBT class"
+[2]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L287-L330   "MRBT.__init__"
+[3]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L332-L351   "MRBT.from_iter"
+[4]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L353-L369   "MRBT.from_dict"
+[5]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L371-L379   "MRBT.size"
+[6]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L381-L389   "MRBT.digest"
+[7]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L391-L427   "MRBT.insert"
+[8]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L429-L466   "MRBT.delete"
+[9]:  https://github.com/Tsekho/MRBT/blob/main/core.py#L468-L508   "MRBT.get"
+[10]: https://github.com/Tsekho/MRBT/blob/main/core.py#L510-L531   "MRBT.set"
+[11]: https://github.com/Tsekho/MRBT/blob/main/core.py#L533-L577   "MRBT.by_keys_order"
+[12]: https://github.com/Tsekho/MRBT/blob/main/core.py#L579-L677   "MRBT.get_change_set"
+[13]: https://github.com/Tsekho/MRBT/blob/main/core.py#L679-L690   "MRBT.__len__"
+[14]: https://github.com/Tsekho/MRBT/blob/main/core.py#L692-L731   "MRBT.__iter__"
+[15]: https://github.com/Tsekho/MRBT/blob/main/core.py#L733-L748   "MRBT.__contains__"
+[16]: https://github.com/Tsekho/MRBT/blob/main/core.py#L750-L768   "MRBT.__getitem__"
+[17]: https://github.com/Tsekho/MRBT/blob/main/core.py#L770-L784   "MRBT.__setitem__"
+[18]: https://github.com/Tsekho/MRBT/blob/main/core.py#L786-L805   "MRBT.__eq__"
+[19]: https://github.com/Tsekho/MRBT/blob/main/core.py#L807-L818   "MRBT.__str__"
 
-[20]: https://github.com/Tsekho/MRBT/blob/main/core.py#L975-L1030 "verify function"
-[21]: https://github.com/Tsekho/MRBT/blob/main/core.py#L975-L1030 "verify"
+[20]: https://github.com/Tsekho/MRBT/blob/main/core.py#L993-L1048 "verify function"
+[21]: https://github.com/Tsekho/MRBT/blob/main/core.py#L993-L1048 "verify"

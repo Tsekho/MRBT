@@ -1,7 +1,7 @@
 import pytest
 
 from core import MRBT, verify
-from math import inf as INF
+from math import ceil, inf as INF
 from random import sample
 
 
@@ -204,7 +204,7 @@ def test_basic_functionality(test_size):
 
     t1.insert(0, "Changed, fail")
 
-    for key in arr_ins[::100]:
+    for key in arr_ins[::10]:
         assert t1.get(key) == str(key)
 
     assert t1.get(-1) is None
@@ -277,18 +277,19 @@ def test_extra_access(test_size):
     assert t1.by_keys_order(-test_size - 1) is None
     assert t1.by_keys_order(test_size) is None
 
-    for key in arr_ins[::100]:
+    for key in arr_ins[::10]:
         assert t1.get(key) == t1[key]
 
 
+@pytest.mark.parametrize("del_frac", [0.0001, 0.001, 0.01, 0.1])
 @pytest.mark.parametrize("test_size", [100, 1000, 10000])
-def test_get_change_set(test_size):
+def test_get_change_set(test_size, del_frac):
     """
     get_change_set
     """
     arr_ins = sample(list(range(test_size)), test_size)
     arr_val = [str(k) for k in arr_ins]
-    arr_del = sample(arr_ins, len(arr_ins) // 100)
+    arr_del = sample(arr_ins, ceil(del_frac * test_size))
 
     t1 = MRBT()
     for i, item in enumerate(zip(arr_ins, arr_val)):

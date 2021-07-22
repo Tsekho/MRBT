@@ -3,7 +3,9 @@ MRBT (Red-Black Merkle Tree)
 ---------
 An efficient authenticated data structure
 based on generic Red-Black Tree with Merkle augmentation.
-Explicit repository at https://github.com/Tsekho/MRBT/.
+
+Explicit repository at:
+    https://github.com/Tsekho/MRBT/.
 
 Original Python 2 implementation:
     Andrew Miller
@@ -11,12 +13,13 @@ Original Python 2 implementation:
 
 General TODO:
     1. Clean the code up.
-    2. Decide whether code should raise exceptions.
+    2. Decide whether the code should raise exceptions.
 """
 
 
 __all__ = ["MRBT", "verify"]
 
+from collections import deque
 import json
 from math import inf as INF
 
@@ -580,7 +583,7 @@ class MRBT:
         ... False positive equals are extremely rare with proper
         ... choice of hash function.
         ... Correctness of return value is not guaranteed.
-        O(n + o) w.c., O(k log2 n) for k << n insertions / deletions / modifications.
+        O(n + o) w.c., O(k log n) for k << n insertions / deletions / modifications.
 
         Parameters
         ----------
@@ -603,57 +606,71 @@ class MRBT:
         ...                     (5, "five")])
         >>> b = MRBT.from_iter([(1, "one"),
         ...                     (2, "six")])
-        >>> print(a.compare(b, as_json=False))
-        [["Destination", {"key": 2, "value": "six"}],
-         ["Source", {"key": 2, "value": "two"}],
-         ["Source", {"key": 5, "value": "five"}]]
+        >>> print(a.get_change_set(b, as_json=False))
+        [['Source', {'key': 2, 'value': 'two'}],
+         ['Destination', {'key': 2, 'value': 'six'}],
+         ['Source', {'key': 5, 'value': 'five'}]]
         """
-        # Two pointers iterating over internal nodes in ascending keys order.
-        # Equal right subtrees are skipped.
-        # Equal keys are checked for equal data with shortcuts to corresponding leaves.
+        # Two pointers iterating over internal nodes in
+        # (black depth; key) pair (descending; ascending) order.
+        # Equal subtrees are skipped. Leaf comparisons are used to estimate the difference.
+        queue = [deque(), deque()]
         focus = [self._root, other._root]
+        depth = [0, 0]
         for i in range(2):
-            while focus[i][0] is not None:
-                focus[i] = focus[i][0]
-            focus[i] = focus[i].parent
+            temp = focus[i]
+            while temp is not None:
+                if temp.color != COL.RED:
+                    depth[i] += 1
+                temp = temp[0]
 
         res = []
 
-        # Controls iteration and skips.
-        def _next(target, skip=False):
-            nonlocal focus
-            if skip:
-                while focus[target].is_right_child():
-                    focus[target] = focus[target].parent
-                focus[target] = focus[target].parent
-            else:
-                focus[target] = focus[target].shortcut.next.shortcut
-
         # Writes to the result.
         def _write(target):
-            nonlocal focus
+            nonlocal focus, res
             res.append(["Destination" if target else "Source",
-                        {"key": focus[target].shortcut.key,
-                         "value": focus[target].shortcut.val}])
+                        {"key": focus[target].key,
+                         "value": focus[target].val}])
 
-        while not (focus[0] is None and focus[1] is None):
+        # Controllable iteration with subtree skipping.
+        def _next(target, skip=False):
+            nonlocal queue, focus, depth
+            if not skip:
+                if focus[target].color == COL.RED:
+                    queue[target].appendleft((depth[target], focus[target][1]))
+                    queue[target].appendleft((depth[target], focus[target][0]))
+                elif focus[target].color == COL.BLACK:
+                    queue[target].append((depth[target] - 1, focus[target][0]))
+                    queue[target].append((depth[target] - 1, focus[target][1]))
+                else:
+                    _write(target)
+            if len(queue[target]):
+                depth[target], focus[target] = queue[target].popleft()
+            else:
+                depth[target], focus[target] = None, None
+
+        while focus[0] is not None or focus[1] is not None:
             if focus[1] is None:
-                _write(0)
                 _next(0)
             elif focus[0] is None:
-                _write(1)
                 _next(1)
-            elif focus[0].key != focus[1].key:
-                target = int(focus[0].key > focus[1].key)
-                _write(target)
-                _next(target)
+            elif focus[0].color == COL.RED:
+                _next(0)
+            elif focus[1].color == COL.RED:
+                _next(1)
+            elif depth[0] > depth[1]:
+                _next(0)
+            elif depth[1] > depth[0]:
+                _next(1)
+            elif focus[0].key < focus[1].key:
+                _next(0)
+            elif focus[1].key < focus[0].key:
+                _next(1)
             else:
-                if focus[0].shortcut.digest != focus[1].shortcut.digest:
-                    _write(0)
-                    _write(1)
-                cut_allowed = (focus[0].digest[1] == focus[1].digest[1])
-                _next(0, skip=cut_allowed)
-                _next(1, skip=cut_allowed)
+                flag_skip = (focus[0].digest == focus[1].digest)
+                _next(0, skip=flag_skip)
+                _next(1, skip=flag_skip)
 
         if as_json:
             return json.dumps(res)
@@ -890,6 +907,7 @@ class MRBT:
 
     def _delete_fix(self, focus: Node, d_black: bool = False) -> None:
         # RBT generic deletion balancing routines.
+        # If "double black" is used, d_black is passed as True.
         # Updates weights and digests on the way.
         while d_black:
             direction = int(focus.is_left_child())
